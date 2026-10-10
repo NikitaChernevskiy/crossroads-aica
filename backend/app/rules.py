@@ -71,21 +71,31 @@ class BehaviorRulesEngine:
         )
 
     def _match_rules(self, state: StoredState) -> list[str]:
-        """Match state against rules and collect instructions."""
-        matched_instructions: list[str] = []
+        """Match state against rules — return ONLY the single best-priority rule.
+
+        Lower priority number = higher importance.  Returning instructions from
+        multiple rules caused conflicting guidance (e.g. "be brief" + "go deep")
+        that the LLM could not satisfy.  Single-rule selection keeps instructions
+        coherent and enforceable.
+        """
         rules = self._rules.get("rules", [])
 
+        best_rule: dict | None = None
+        best_priority = float("inf")
+
         for rule in rules:
-            if self._rule_matches(rule, state):
-                matched_instructions.extend(rule.get("instructions", []))
+            priority = rule.get("priority", 99)
+            if priority < best_priority and self._rule_matches(rule, state):
+                best_rule = rule
+                best_priority = priority
 
-        # If no rules matched, use calm/focused default
-        if not matched_instructions:
-            matched_instructions = self._rules.get("default_fresh_instructions", [
-                "User appears balanced — respond with normal detail and tone"
-            ])
+        if best_rule:
+            return best_rule.get("instructions", [])
 
-        return matched_instructions
+        # No rules matched — use calm/focused default
+        return self._rules.get("default_fresh_instructions", [
+            "User appears balanced — respond with normal detail and tone"
+        ])
 
     def _rule_matches(self, rule: dict, state: StoredState) -> bool:
         """Check if a single rule's conditions match the state."""

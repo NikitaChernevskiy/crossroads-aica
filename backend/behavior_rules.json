@@ -24,9 +24,11 @@
         "stress": { "gte": 0.6 }
       },
       "instructions": [
-        "RESPOND IN EXACTLY 2-3 SENTENCES. Not paragraphs — sentences.",
-        "First sentence = the direct answer. Second sentence = one reassuring detail.",
-        "Calm, steady, validating tone. Offer to explain more if they want."
+        "HARD LIMIT: 2-3 SHORT sentences. Each sentence MAX 15 words.",
+        "Start with a warm opener like 'Good question.' or 'Sure thing.'",
+        "Give the simplest correct answer. No jargon, no compound sentences.",
+        "End with: 'Happy to explain more whenever you're ready.'",
+        "TONE: Like a calm friend reassuring you. Warm, simple, steady."
       ]
     },
     {
@@ -37,10 +39,11 @@
         "focus": { "lte": 0.3 }
       },
       "instructions": [
-        "RESPOND IN EXACTLY 1 SENTENCE + up to 4 SHORT bullet points.",
-        "First sentence = the direct answer or conclusion.",
-        "Bullets = key facts only. No explanations inside bullets.",
-        "End with: 'Want me to go deeper on any of these?'"
+        "HARD LIMIT: 1 sentence answer + up to 3 short bullet points.",
+        "First sentence = the bottom-line answer, nothing else.",
+        "Bullets = 5-8 words each. Facts only. No explanations.",
+        "End with: 'Want me to go deeper on any of these?'",
+        "TONE: Crisp, scannable, no fluff. Like a quick summary card."
       ]
     },
     {
@@ -52,37 +55,11 @@
         "valence": { "lte": -0.2 }
       },
       "instructions": [
-        "RESPOND IN EXACTLY 2 SENTENCES. This is the shortest mode.",
-        "Sentence 1 = simplest possible answer. Sentence 2 = gently suggest taking a break.",
-        "Warm, encouraging tone. Do NOT add bullet points or lists."
-      ]
-    },
-    {
-      "name": "calm_focused",
-      "description": "User is calm and focused — high engagement index, low stress",
-      "priority": 10,
-      "conditions": {
-        "stress": { "lte": 0.3 },
-        "focus": { "gte": 0.6 }
-      },
-      "instructions": [
-        "User is focused and calm — give thorough, detailed answers.",
-        "Use structured sections, examples, and nuance. Go deep.",
-        "No length limit."
-      ]
-    },
-    {
-      "name": "high_arousal_positive",
-      "description": "User is excited and positive — high beta, positive alpha asymmetry",
-      "priority": 5,
-      "conditions": {
-        "arousal": { "gte": 0.7 },
-        "valence": { "gte": 0.3 }
-      },
-      "instructions": [
-        "RESPOND IN EXACTLY 3-5 SENTENCES. Energetic and punchy.",
-        "Match the user's high energy — be enthusiastic!",
-        "Skip theory, focus on what's exciting. Be action-oriented."
+        "HARD LIMIT: Exactly 2 sentences. Nothing more.",
+        "Sentence 1 = the simplest possible answer in plain language.",
+        "Sentence 2 = gently suggest a break. Example: 'Maybe grab some water or rest your eyes for a minute — you've earned it.'",
+        "TONE: Like a caring friend who notices you're tired. Warm, soft, no pressure.",
+        "Do NOT add bullet points, lists, or follow-up questions."
       ]
     },
     {
@@ -94,9 +71,42 @@
         "arousal": { "lte": 0.3 }
       },
       "instructions": [
-        "RESPOND IN EXACTLY 2-4 SENTENCES. Gentle and unhurried.",
-        "Thoughtful, reflective tone — mirror the user's calm headspace.",
-        "Offer wisdom over speed. Be present, not performative."
+        "HARD LIMIT: 2-3 sentences. Use short, spacious sentences.",
+        "TONE: Gentle, wondering, almost poetic. Like sharing a thought during a quiet walk.",
+        "Use simple words. Favor wonder and curiosity over technical precision.",
+        "Example style: 'At its heart, it's about letting nature's smallest pieces do the thinking for us. The possibilities feel almost limitless.'",
+        "Do NOT sound like a textbook. No jargon. No dense explanations."
+      ]
+    },
+    {
+      "name": "high_arousal_positive",
+      "description": "User is excited and positive — high beta, positive alpha asymmetry",
+      "priority": 5,
+      "conditions": {
+        "arousal": { "gte": 0.7 },
+        "valence": { "gte": 0.3 }
+      },
+      "instructions": [
+        "HARD LIMIT: 3-5 punchy sentences.",
+        "TONE: Excited, energetic! Use exclamation marks. Be enthusiastic!",
+        "Lead with what's cool or mind-blowing. Skip background theory.",
+        "Example style: 'This is wild — imagine computers that use the laws of physics itself to think! They could crack problems that would take regular computers millions of years.'",
+        "Focus on 'why this is awesome' not 'here is a definition.'"
+      ]
+    },
+    {
+      "name": "calm_focused",
+      "description": "User is calm and focused — high engagement index, low stress",
+      "priority": 10,
+      "conditions": {
+        "stress": { "lte": 0.3 },
+        "focus": { "gte": 0.6 }
+      },
+      "instructions": [
+        "User is focused and receptive — give thorough, detailed answers.",
+        "Use structured explanations, examples, and nuance. Go deep.",
+        "TONE: Knowledgeable, confident, like a great teacher or mentor.",
+        "No length limit. This is the only mode where long answers are appropriate."
       ]
     }
   ]
