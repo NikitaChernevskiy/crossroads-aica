@@ -9,6 +9,7 @@ Architecture:
 """
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 from typing import Optional
@@ -59,8 +60,10 @@ def get_behavior_guidance(user_id: str) -> str:
     if _store is None or _engine is None:
         return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
                            "instructions": ["Respond normally — system not ready"]})
-    # We're in asyncio.to_thread → no event loop → asyncio.run is safe
-    state = asyncio.run(_store.get_current_state(user_id))
+    # The SDK's create_and_process may already have an event loop running,
+    # so asyncio.run() would fail.  Spawn a fresh thread where no loop exists.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        state = pool.submit(asyncio.run, _store.get_current_state(user_id)).result()
     guidance = _engine.evaluate(state)
     return json.dumps(guidance.model_dump())
 
@@ -148,11 +151,12 @@ class AgentService:
                 logger.error("Agent run failed: %s", err)
                 return tid, f"I had trouble processing that. ({err})"
 
-            # Get assistant's response
-            text = self.client.messages.get_last_message_text_by_role(  # type: ignore[union-attr]
+            # Get assistant's response (returns MessageTextContent | None)
+            msg = self.client.messages.get_last_message_text_by_role(  # type: ignore[union-attr]
                 thread_id=tid, role="assistant"
             )
-            return tid, text or "I'm here for you."
+            text = msg.text if msg else "I'm here for you."
+            return tid, str(text)
 
         result_tid, response_text = await asyncio.to_thread(_sync_chat)
 
