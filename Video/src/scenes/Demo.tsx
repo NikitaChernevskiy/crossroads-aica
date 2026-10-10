@@ -17,7 +17,8 @@ const Half: React.FC<{
   readonly file: string;
   readonly available: boolean;
   readonly trimStart: number;
-}> = ({ label, accent, indicators, instructions, file, available, trimStart }) => {
+  readonly placeholder: { title: string; steps: string[] };
+}> = ({ label, accent, indicators, instructions, file, available, trimStart, placeholder }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const shown = instructions.slice(0, MAX_LINES);
@@ -48,12 +49,24 @@ const Half: React.FC<{
             style={{ width: "100%", height: "100%" }}
           />
         ) : (
-          <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", gap: 16, padding: 40, textAlign: "center" }}>
-            <div style={{ fontSize: 44, fontWeight: 800, color: colors.stress }}>Recording needed</div>
-            <div style={{ fontSize: 30, color: colors.muted, fontFamily: monoFamily }}>public/{file}</div>
-            <div style={{ fontSize: 28, color: colors.muted }}>
-              "{config.demoQuestion}" · {label.toLowerCase()} state
-            </div>
+          <AbsoluteFill
+            style={{
+              justifyContent: "center",
+              alignItems: "flex-start",
+              gap: 18,
+              padding: "40px 56px",
+              border: `4px dashed ${colors.stress}`,
+              borderRadius: 20,
+            }}
+          >
+            <div style={{ fontSize: 26, fontWeight: 800, color: colors.stress, letterSpacing: 3 }}>PLACEHOLDER · SCREEN RECORDING</div>
+            <div style={{ fontSize: 40, fontWeight: 800 }}>{placeholder.title}</div>
+            {placeholder.steps.map((s, i) => (
+              <div key={s} style={{ fontSize: 28, color: colors.text, lineHeight: 1.35 }}>
+                <span style={{ color: colors.stress, fontWeight: 800 }}>{i + 1}.</span> {s}
+              </div>
+            ))}
+            <div style={{ fontSize: 24, color: colors.muted, fontFamily: monoFamily }}>→ save as public/{file}</div>
           </AbsoluteFill>
         )}
       </div>
@@ -114,6 +127,15 @@ export const Demo: React.FC = () => {
           file="demo-focused.mp4"
           available={media.demoFocused}
           trimStart={config.demoFocusedTrimStart}
+          placeholder={{
+            title: "Sensor client + chat, focused state",
+            steps: [
+              "Simulator set to Focused (stress 0.15, focus 0.80)",
+              `User asks: "${config.demoQuestion}"`,
+              "Agent replies in detail: several options, structured",
+              "~12 s, chat zoomed so the reply is readable",
+            ],
+          }}
         />
       </Sequence>
       <Sequence name="Tense state" from={13.5 * fps} durationInFrames={13.5 * fps} premountFor={fps}>
@@ -125,6 +147,15 @@ export const Demo: React.FC = () => {
           file="demo-tense.mp4"
           available={media.demoTense}
           trimStart={config.demoTenseTrimStart}
+          placeholder={{
+            title: "Same chat, tense state",
+            steps: [
+              "Simulator set to Tense (stress 0.68, focus 0.41)",
+              `Same question: "${config.demoQuestion}"`,
+              "Agent replies short and calm: one next step",
+              "~13 s, same agent and settings as the focused clip",
+            ],
+          }}
         />
       </Sequence>
     </Scene>

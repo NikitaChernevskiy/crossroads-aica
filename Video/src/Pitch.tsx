@@ -2,6 +2,7 @@ import { Audio } from "@remotion/media";
 import { AbsoluteFill, Series, staticFile, useVideoConfig } from "remotion";
 import { Captions } from "./components/Captions";
 import media from "./data/media.json";
+import config from "./data/config.json";
 import S from "./data/timeline.json";
 import { Close } from "./scenes/Close";
 import { Demo } from "./scenes/Demo";
@@ -13,6 +14,10 @@ import { Revenue } from "./scenes/Revenue";
 import { TeamSlide, teamSlideDefaults } from "./TeamSlide";
 import { Voiceover } from "./components/Voiceover";
 import { colors } from "./theme";
+
+// Shown until every required input exists (same conditions as scripts/check.mjs).
+const isDraft =
+  !media.demoFocused || !media.demoTense || !config.lovableContribution || Object.keys(media.voiceover).length < Object.keys(S).length;
 
 export const totalSeconds = Object.values(S).reduce((a, b) => a + b, 0);
 
@@ -49,6 +54,26 @@ export const Pitch: React.FC = () => {
         </Series.Sequence>
       </Series>
       <Captions />
+      {isDraft ? (
+        <div
+          style={{
+            position: "absolute",
+            top: 24,
+            right: 28,
+            padding: "6px 16px",
+            borderRadius: 8,
+            border: "2px solid #FF6B6B",
+            color: "#FF6B6B",
+            fontFamily: "Inter",
+            fontSize: 22,
+            fontWeight: 800,
+            letterSpacing: 3,
+            background: "rgba(7,11,26,0.7)",
+          }}
+        >
+          DRAFT
+        </div>
+      ) : null}
       {media.music ? <Audio name="Music" src={staticFile("music.wav")} loop volume={0.07} premountFor={fps} /> : null}
     </AbsoluteFill>
   );

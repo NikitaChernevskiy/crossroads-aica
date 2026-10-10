@@ -50,6 +50,6 @@ export const Todo: React.FC<{ readonly children: React.ReactNode }> = ({ childre
       padding: "2px 12px",
     }}
   >
-    TODO: {children}
+    PLACEHOLDER · {children}
   </span>
 );

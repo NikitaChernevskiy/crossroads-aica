@@ -47,7 +47,7 @@ const FinalCard: React.FC = () => {
         {config.teamName} · <span style={{ fontFamily: monoFamily }}>{config.repoUrl}</span>
       </div>
       <div style={{ fontSize: 30, color: colors.muted, ...enter(frame, 1.3 * fps, fps) }}>
-        Built with Claude Code · {config.lovableContribution ? "Lovable" : <Todo>Lovable contribution</Todo>} · on Azure &amp;
+        Built with Claude Code · {config.lovableContribution ? "Lovable" : <Todo>Lovable: what it built (e.g. landing page)</Todo>} · on Azure &amp;
         Microsoft Foundry
       </div>
     </AbsoluteFill>
