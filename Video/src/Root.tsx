@@ -1,6 +1,7 @@
 import { Composition, Folder } from "remotion";
 import S from "./data/timeline.json";
 import { Pitch, totalSeconds } from "./Pitch";
+import { Architecture } from "./scenes/Architecture";
 import { Close } from "./scenes/Close";
 import { Demo } from "./scenes/Demo";
 import { Different } from "./scenes/Different";
@@ -18,6 +19,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition id="Opening" component={Opening} durationInFrames={S.opening * 30} fps={30} width={1920} height={1080} />
         <Composition id="Product" component={Product} durationInFrames={S.product * 30} fps={30} width={1920} height={1080} />
         <Composition id="Demo" component={Demo} durationInFrames={S.demo * 30} fps={30} width={1920} height={1080} />
+        <Composition id="Architecture" component={Architecture} durationInFrames={S.architecture * 30} fps={30} width={1920} height={1080} />
         <Composition id="Market" component={Market} durationInFrames={S.market * 30} fps={30} width={1920} height={1080} />
         <Composition id="Revenue" component={Revenue} durationInFrames={S.revenue * 30} fps={30} width={1920} height={1080} />
         <Composition id="Different" component={Different} durationInFrames={S.different * 30} fps={30} width={1920} height={1080} />

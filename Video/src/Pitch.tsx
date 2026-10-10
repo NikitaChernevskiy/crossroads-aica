@@ -4,6 +4,7 @@ import { Captions } from "./components/Captions";
 import media from "./data/media.json";
 import config from "./data/config.json";
 import S from "./data/timeline.json";
+import { Architecture } from "./scenes/Architecture";
 import { Close } from "./scenes/Close";
 import { Demo } from "./scenes/Demo";
 import { Different } from "./scenes/Different";
@@ -33,23 +34,26 @@ export const Pitch: React.FC = () => {
         <Series.Sequence name="0:12 Product & buyer" durationInFrames={S.product * fps} premountFor={fps}>
           <Product />
         </Series.Sequence>
-        <Series.Sequence name="0:25 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
+        <Series.Sequence name="0:24 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
           <Demo />
         </Series.Sequence>
-        <Series.Sequence name="0:52 Market" durationInFrames={S.market * fps} premountFor={fps}>
+        <Series.Sequence name="0:46 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
+          <Architecture />
+        </Series.Sequence>
+        <Series.Sequence name="0:58 Market" durationInFrames={S.market * fps} premountFor={fps}>
           <Market />
         </Series.Sequence>
-        <Series.Sequence name="1:06 Revenue & GTM" durationInFrames={S.revenue * fps} premountFor={fps}>
+        <Series.Sequence name="1:12 Revenue & GTM" durationInFrames={S.revenue * fps} premountFor={fps}>
           <Revenue />
         </Series.Sequence>
-        <Series.Sequence name="1:21 Differentiation" durationInFrames={S.different * fps} premountFor={fps}>
+        <Series.Sequence name="1:25 Differentiation" durationInFrames={S.different * fps} premountFor={fps}>
           <Different />
         </Series.Sequence>
-        <Series.Sequence name="1:35 Team" durationInFrames={S.team * fps} premountFor={fps}>
+        <Series.Sequence name="1:39 Team" durationInFrames={S.team * fps} premountFor={fps}>
           <TeamSlide {...teamSlideDefaults} />
           <Voiceover id="team" />
         </Series.Sequence>
-        <Series.Sequence name="1:45 Close" durationInFrames={S.close * fps} premountFor={fps}>
+        <Series.Sequence name="1:49 Close" durationInFrames={S.close * fps} premountFor={fps}>
           <Close />
         </Series.Sequence>
       </Series>

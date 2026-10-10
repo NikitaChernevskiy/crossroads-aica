@@ -2,6 +2,7 @@
   "opening": "Help me plan my evening. Some days, I want a detailed plan with options. Other days, I'm overwhelmed, and I just need one next step. Same question. Different needs.",
   "product": "AI Emotional Partner helps wellbeing apps build that adaptation into their AI. We don’t sell a wearable or a chatbot. We sell an integration layer to the companies behind those apps.",
   "demo": "Here's our working reference build, using simulated input. Same question, two estimated states. Before answering, the agent calls get behavior guidance. Focused: detail is welcome. Tense: be brief, calm, and go step by step. And the answer changes with it.",
+  "architecture": "Raw signals stay local. Estimated state reaches Azure, where our MCP server turns it into guidance for Foundry agents. Next: multimodal emotional intelligence.",
   "market": "Health and fitness apps earned four point five billion dollars from in-app purchases in 2025, according to Sensor Tower. We start narrower: wellbeing apps that already integrate wearables.",
   "revenue": "Apps pay a base subscription plus usage, tied to active users with adaptation enabled. Our path: three paid pilots in one segment, then standardize the integration and expand.",
   "different": "Most tools stop at a dashboard. We turn estimated state indicators from wearables into guidance an AI agent can act on. The question we’ll test: is it better than a simple shorter-answer button?",

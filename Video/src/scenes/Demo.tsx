@@ -118,7 +118,7 @@ export const Demo: React.FC = () => {
           Same question: <span style={{ color: colors.calm }}>"{config.demoQuestion}"</span>
         </div>
       </div>
-      <Sequence name="Focused state" from={1 * fps} durationInFrames={12.5 * fps} premountFor={fps}>
+      <Sequence name="Focused state" from={1 * fps} durationInFrames={11.5 * fps} premountFor={fps}>
         <Half
           label="Focused"
           accent={colors.azure}
@@ -133,12 +133,12 @@ export const Demo: React.FC = () => {
               "Simulator set to Focused (stress 0.15, focus 0.80)",
               `User asks: "${config.demoQuestion}"`,
               "Agent replies in detail: several options, structured",
-              "~12 s, chat zoomed so the reply is readable",
+              "~11 s, chat zoomed so the reply is readable",
             ],
           }}
         />
       </Sequence>
-      <Sequence name="Tense state" from={13.5 * fps} durationInFrames={13.5 * fps} premountFor={fps}>
+      <Sequence name="Tense state" from={12.5 * fps} durationInFrames={9.5 * fps} premountFor={fps}>
         <Half
           label="Tense"
           accent={colors.calm}
@@ -153,7 +153,7 @@ export const Demo: React.FC = () => {
               "Simulator set to Tense (stress 0.68, focus 0.41)",
               `Same question: "${config.demoQuestion}"`,
               "Agent replies short and calm: one next step",
-              "~13 s, same agent and settings as the focused clip",
+              "~9 s, same agent and settings as the focused clip",
             ],
           }}
         />

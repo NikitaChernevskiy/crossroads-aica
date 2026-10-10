@@ -1,21 +1,22 @@
 # AI Emotional Partner: investor pitch and demo video
 
-Remotion project. Output: MP4, 1920x1080, H.264 + AAC, 1:55, burned-in English captions plus `out/captions.srt`.
+Remotion project. Output: MP4, 1920x1080, H.264 + AAC, 1:59, burned-in English captions plus `out/captions.srt`.
 
 ## Edit specification (fixed timeline in `src/data/timeline.json`)
 
 | Time | Scene | Purpose | On screen |
 |---|---|---|---|
 | 0:00–0:12 | Opening | Human problem | Split screen, same question in two situations. "Same question. Different needs." Labeled *Illustration* |
-| 0:12–0:25 | Product | Product + buyer | Person → Wellbeing app (our customer) → AI Emotional Partner. "We sell to app developers" |
-| 0:25–0:52 | Demo | Core capability | Two real recordings (focused, tense) + estimated state + **real** `get_behavior_guidance` output |
-| 0:52–1:06 | Market | Context + segment | One verified stat with source, then "Wellbeing apps already integrating wearables" |
-| 1:06–1:21 | Revenue | Model + GTM | "B2B subscription + usage" (proposed), 4-step pilot → expand path |
-| 1:21–1:35 | Different | Differentiation | Device → Estimated state → **Behavior guidance** → AI response; key validation question |
-| 1:35–1:45 | Team (`TeamSlide`) | Credibility | Three team cards, see "Team scene" below |
-| 1:45–1:55 | Close | Milestone + ask | Three paid pilots; pilot-partner ask; final card with "Built with Claude Code · Lovable · on Azure & Microsoft Foundry" |
+| 0:12–0:24 | Product | Product + buyer | Person → Wellbeing app (our customer) → AI Emotional Partner. "We sell to app developers" |
+| 0:24–0:46 | Demo | Core capability | Two real recordings (focused, tense) + estimated state + **real** `get_behavior_guidance` output |
+| 0:46–0:58 | Architecture | Technical credibility | Human → Muse S Athena → Local processing ("Raw Signals Stay Local") → Microsoft Azure (Container Apps: State API + **MCP Guidance Server**, Cosmos DB; Entra, Monitor) → Microsoft Foundry → Personalized response. Stressed/Focused example. Then a dashed **Future research** panel: multimodal inputs, "Toward Adaptive AI Without Wearables". Official Azure icons in `public/icons/` |
+| 0:58–1:12 | Market | Context + segment | One verified stat with source, then "Wellbeing apps already integrating wearables" |
+| 1:12–1:25 | Revenue | Model + GTM | "B2B subscription + usage" (proposed), 4-step pilot → expand path |
+| 1:25–1:39 | Different | Differentiation | Device → Estimated state → **Behavior guidance** → AI response; key validation question |
+| 1:39–1:49 | Team (`TeamSlide`) | Credibility | Three team cards, see "Team scene" below |
+| 1:49–1:59 | Close | Milestone + ask | Three paid pilots; pilot-partner ask; final card with "Built with Claude Code · Lovable · on Azure & Microsoft Foundry" |
 
-## Team scene (1:35–1:45, 10 s, composition `TeamSlide`; 9:16 variant `TeamSlideVertical`)
+## Team scene (1:39–1:49, 10 s, composition `TeamSlide`; 9:16 variant `TeamSlideVertical`)
 
 On-screen text (verbatim, source of truth is `src/TeamSlide.tsx`):
 
@@ -49,8 +50,8 @@ Narration: `scripts/script.json` (231 words). Visible text and labels: `src/data
 ## To finish (in order)
 
 1. **Record the demo**: two clips with the same question, same agent and same settings, only the simulated state changes.
-   - `public/demo-focused.mp4`: simulator set to focused, ask "Help me plan my evening.", wait for the full reply (≈12 s used)
-   - `public/demo-tense.mp4`: simulator set to tense, same question (≈13 s used)
+   - `public/demo-focused.mp4`: simulator set to focused, ask "Help me plan my evening.", wait for the full reply (≈11 s used)
+   - `public/demo-tense.mp4`: simulator set to tense, same question (≈9 s used)
    - Zoom the browser so the reply is readable at 1080p. If a clip has dead time at the start, set `demoFocusedTrimStart` / `demoTenseTrimStart` (seconds) in `config.json`.
    - If you use a recorded sensor session instead of the simulator, set `demoInputLabel` to `"Recorded session"`.
 2. **Fill in `src/data/config.json`**: `lovableContribution`. If Lovable isn't actually used yet, build the landing page first. The submission requires it.
