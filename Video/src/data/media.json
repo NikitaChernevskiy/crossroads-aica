@@ -1,14 +1,15 @@
 {
+  "voiceoverExpected": 9,
   "voiceover": {
     "opening": 11.18,
     "product": 11.23,
     "demo": 17.58,
     "architecture": 10.63,
+    "euact": 8.96,
     "market": 12.3,
     "revenue": 11.78,
-    "different": 12.36,
     "team": 6.27,
-    "close": 7.89
+    "close": 10.76
   },
   "demoFocused": false,
   "demoTense": false,

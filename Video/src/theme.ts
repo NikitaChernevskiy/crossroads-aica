@@ -1,5 +1,6 @@
 import { loadFont } from "@remotion/google-fonts/Inter";
 import { loadFont as loadMono } from "@remotion/google-fonts/JetBrainsMono";
+import { loadFont as loadEmoji } from "@remotion/google-fonts/NotoColorEmoji";
 import { Easing, interpolate } from "remotion";
 
 export const { fontFamily } = loadFont("normal", {
@@ -51,3 +52,8 @@ export const progress = (frame: number, start: number, end: number) =>
     extrapolateRight: "clamp",
     easing: ease,
   });
+
+export const { fontFamily: emojiFamily } = loadEmoji();
+
+// One face per estimated state, used everywhere a state is shown.
+export const faces = { focused: "😊", tense: "😰" } as const;

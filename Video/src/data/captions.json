@@ -1,277 +1,262 @@
 [
   {
     "text": "Help me plan my evening.",
-    "startMs": 300,
-    "endMs": 1955
+    "startMs": 4300,
+    "endMs": 5955
   },
   {
     "text": "Some days, I want a detailed plan",
-    "startMs": 2030,
-    "endMs": 3829
+    "startMs": 6030,
+    "endMs": 7829
   },
   {
     "text": "with options.",
-    "startMs": 3829,
-    "endMs": 4973
+    "startMs": 7829,
+    "endMs": 8973
   },
   {
     "text": "Other days, I'm overwhelmed, and I just",
-    "startMs": 5165,
-    "endMs": 7370
+    "startMs": 9165,
+    "endMs": 11370
   },
   {
     "text": "need one next step.",
-    "startMs": 7370,
-    "endMs": 8886
+    "startMs": 11370,
+    "endMs": 12886
   },
   {
     "text": "Same question.",
-    "startMs": 9147,
-    "endMs": 10296
+    "startMs": 13147,
+    "endMs": 14296
   },
   {
     "text": "Different needs.",
-    "startMs": 10296,
-    "endMs": 11696
+    "startMs": 14296,
+    "endMs": 15696
   },
   {
     "text": "AI Emotional Partner helps wellbeing apps build",
-    "startMs": 12300,
-    "endMs": 15342
+    "startMs": 16300,
+    "endMs": 19342
   },
   {
     "text": "that adaptation into their AI.",
-    "startMs": 15342,
-    "endMs": 17473
+    "startMs": 19342,
+    "endMs": 21473
   },
   {
     "text": "We don’t sell a wearable or a",
-    "startMs": 17733,
-    "endMs": 19196
+    "startMs": 21733,
+    "endMs": 23196
   },
   {
     "text": "chatbot.",
-    "startMs": 19196,
-    "endMs": 20079
+    "startMs": 23196,
+    "endMs": 24079
   },
   {
     "text": "We sell an integration layer to the",
-    "startMs": 20079,
-    "endMs": 21727
+    "startMs": 24079,
+    "endMs": 25727
   },
   {
     "text": "companies behind those apps.",
-    "startMs": 21727,
-    "endMs": 23742
+    "startMs": 25727,
+    "endMs": 27742
   },
   {
     "text": "Here's our working reference build, using simulated",
-    "startMs": 24300,
-    "endMs": 27098
+    "startMs": 28300,
+    "endMs": 31098
   },
   {
     "text": "input.",
-    "startMs": 27098,
-    "endMs": 27940
+    "startMs": 31098,
+    "endMs": 31940
   },
   {
     "text": "Same question, two estimated states.",
-    "startMs": 28073,
-    "endMs": 30715
+    "startMs": 32073,
+    "endMs": 34715
   },
   {
     "text": "Before answering, the agent calls get behavior",
-    "startMs": 30906,
-    "endMs": 33402
+    "startMs": 34906,
+    "endMs": 37402
   },
   {
     "text": "guidance.",
-    "startMs": 33402,
-    "endMs": 34256
+    "startMs": 37402,
+    "endMs": 38256
   },
   {
     "text": "Focused:",
-    "startMs": 34331,
-    "endMs": 35190
+    "startMs": 38331,
+    "endMs": 39190
   },
   {
     "text": "detail is welcome.",
-    "startMs": 35190,
-    "endMs": 36560
+    "startMs": 39190,
+    "endMs": 40560
   },
   {
     "text": "Tense:",
-    "startMs": 36560,
-    "endMs": 37280
+    "startMs": 40560,
+    "endMs": 41280
   },
   {
     "text": "be brief, calm, and go step by",
-    "startMs": 37280,
-    "endMs": 39196
+    "startMs": 41280,
+    "endMs": 43196
   },
   {
     "text": "step.",
-    "startMs": 39196,
-    "endMs": 39956
+    "startMs": 43196,
+    "endMs": 43956
   },
   {
     "text": "And the answer changes with it.",
-    "startMs": 40148,
-    "endMs": 42104
+    "startMs": 44148,
+    "endMs": 46104
   },
   {
     "text": "Raw signals stay local.",
-    "startMs": 46300,
-    "endMs": 48123
+    "startMs": 50300,
+    "endMs": 52123
   },
   {
     "text": "Estimated state reaches Azure, where our MCP",
-    "startMs": 48123,
-    "endMs": 51072
+    "startMs": 52123,
+    "endMs": 55072
   },
   {
     "text": "server turns it into guidance for Foundry",
-    "startMs": 51072,
-    "endMs": 53069
+    "startMs": 55072,
+    "endMs": 57069
   },
   {
     "text": "agents.",
-    "startMs": 53069,
-    "endMs": 53934
+    "startMs": 57069,
+    "endMs": 57934
   },
   {
     "text": "Next:",
-    "startMs": 54195,
-    "endMs": 54775
+    "startMs": 58195,
+    "endMs": 58775
   },
   {
     "text": "multimodal emotional intelligence.",
-    "startMs": 54775,
-    "endMs": 57138
+    "startMs": 58775,
+    "endMs": 61138
+  },
+  {
+    "text": "Emotion recognition is high-risk under the EU",
+    "startMs": 62300,
+    "endMs": 65028
+  },
+  {
+    "text": "AI Act.",
+    "startMs": 65028,
+    "endMs": 66126
+  },
+  {
+    "text": "We build for it:",
+    "startMs": 66155,
+    "endMs": 67304
+  },
+  {
+    "text": "informed users, never at work or school,",
+    "startMs": 67304,
+    "endMs": 69916
+  },
+  {
+    "text": "human oversight.",
+    "startMs": 69916,
+    "endMs": 71466
   },
   {
     "text": "Health and fitness apps earned four point",
-    "startMs": 58300,
-    "endMs": 60576
+    "startMs": 72300,
+    "endMs": 74576
   },
   {
     "text": "five billion dollars from in-app purchases in",
-    "startMs": 60576,
-    "endMs": 63176
+    "startMs": 74576,
+    "endMs": 77176
   },
   {
     "text": "2025, according to Sensor Tower.",
-    "startMs": 63176,
-    "endMs": 66108
+    "startMs": 77176,
+    "endMs": 80108
   },
   {
     "text": "We start narrower:",
-    "startMs": 66299,
-    "endMs": 67646
+    "startMs": 80299,
+    "endMs": 81646
   },
   {
     "text": "wellbeing apps that already integrate wearables.",
-    "startMs": 67646,
-    "endMs": 70810
+    "startMs": 81646,
+    "endMs": 84810
   },
   {
     "text": "Apps pay a base subscription plus usage,",
-    "startMs": 72300,
-    "endMs": 74994
+    "startMs": 85300,
+    "endMs": 87994
   },
   {
     "text": "tied to active users with adaptation enabled.",
-    "startMs": 74994,
-    "endMs": 78018
+    "startMs": 87994,
+    "endMs": 91018
   },
   {
     "text": "Our path:",
-    "startMs": 78279,
-    "endMs": 79150
+    "startMs": 91279,
+    "endMs": 92150
   },
   {
     "text": "three paid pilots in one segment, then",
-    "startMs": 79150,
-    "endMs": 81553
+    "startMs": 92150,
+    "endMs": 94553
   },
   {
     "text": "standardize the integration and expand.",
-    "startMs": 81553,
-    "endMs": 84299
-  },
-  {
-    "text": "Most tools stop at a dashboard.",
-    "startMs": 85300,
-    "endMs": 87477
-  },
-  {
-    "text": "We turn estimated state indicators from wearables",
-    "startMs": 87610,
-    "endMs": 90606
-  },
-  {
-    "text": "into guidance an AI agent can act",
-    "startMs": 90606,
-    "endMs": 92754
-  },
-  {
-    "text": "on.",
-    "startMs": 92754,
-    "endMs": 93305
-  },
-  {
-    "text": "The question we’ll test:",
-    "startMs": 93497,
-    "endMs": 94936
-  },
-  {
-    "text": "is it better than a simple shorter-answer",
-    "startMs": 94936,
-    "endMs": 96922
-  },
-  {
-    "text": "button?",
-    "startMs": 96922,
-    "endMs": 97857
+    "startMs": 94553,
+    "endMs": 97299
   },
   {
     "text": "We’re a small team that combines Azure",
-    "startMs": 99300,
-    "endMs": 101320
+    "startMs": 98300,
+    "endMs": 100320
   },
   {
     "text": "engineering, product thinking and real understanding of",
-    "startMs": 101320,
-    "endMs": 104316
+    "startMs": 100320,
+    "endMs": 103316
   },
   {
     "text": "how people feel.",
-    "startMs": 104316,
-    "endMs": 105773
+    "startMs": 103316,
+    "endMs": 104773
   },
   {
-    "text": "Next:",
-    "startMs": 109300,
-    "endMs": 109857
+    "text": "We are raising to validate at scale,",
+    "startMs": 107300,
+    "endMs": 109425
   },
   {
-    "text": "three paid pilots.",
-    "startMs": 109857,
-    "endMs": 111280
+    "text": "add rings and smartwatches, and read emotion",
+    "startMs": 109425,
+    "endMs": 112025
   },
   {
-    "text": "We're not building another AI companion.",
-    "startMs": 111471,
-    "endMs": 113770
+    "text": "in conversations, toward emotional AI without wearables.",
+    "startMs": 112025,
+    "endMs": 115805
   },
   {
-    "text": "We're helping wellbeing apps respond to the",
-    "startMs": 113770,
-    "endMs": 115929
-  },
-  {
-    "text": "person using them.",
-    "startMs": 115929,
-    "endMs": 117398
+    "text": "Not everything is measured in money.",
+    "startMs": 115996,
+    "endMs": 118278
   }
 ]

@@ -1,5 +1,5 @@
 import { Audio } from "@remotion/media";
-import { AbsoluteFill, Series, staticFile, useVideoConfig } from "remotion";
+import { AbsoluteFill, interpolate, Series, staticFile, useVideoConfig } from "remotion";
 import { Captions } from "./components/Captions";
 import media from "./data/media.json";
 import config from "./data/config.json";
@@ -7,18 +7,27 @@ import S from "./data/timeline.json";
 import { Architecture } from "./scenes/Architecture";
 import { Close } from "./scenes/Close";
 import { Demo } from "./scenes/Demo";
-import { Different } from "./scenes/Different";
+import { EuAiAct } from "./scenes/EuAiAct";
 import { Market } from "./scenes/Market";
 import { Opening } from "./scenes/Opening";
 import { Product } from "./scenes/Product";
 import { Revenue } from "./scenes/Revenue";
+import { Title } from "./scenes/Title";
 import { TeamSlide, teamSlideDefaults } from "./TeamSlide";
 import { Voiceover } from "./components/Voiceover";
 import { colors } from "./theme";
 
 // Shown until every required input exists (same conditions as scripts/check.mjs).
 const isDraft =
-  !media.demoFocused || !media.demoTense || !config.lovableContribution || Object.keys(media.voiceover).length < Object.keys(S).length;
+  !media.demoFocused || !media.demoTense || !config.lovableContribution || Object.keys(media.voiceover).length < media.voiceoverExpected;
+
+const musicVolume = (f: number, fps: number) =>
+  interpolate(
+    f / fps,
+    [0, 0.5, S.title - 0.5, S.title + 0.5, totalSeconds - 3, totalSeconds],
+    [0, 0.32, 0.32, 0.13, 0.13, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
 
 export const totalSeconds = Object.values(S).reduce((a, b) => a + b, 0);
 
@@ -28,32 +37,35 @@ export const Pitch: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: colors.bg }}>
       <Series>
-        <Series.Sequence name="0:00 Opening" durationInFrames={S.opening * fps} premountFor={fps}>
+        <Series.Sequence name="0:00 Title" durationInFrames={S.title * fps} premountFor={fps}>
+          <Title />
+        </Series.Sequence>
+        <Series.Sequence name="0:04 Opening" durationInFrames={S.opening * fps} premountFor={fps}>
           <Opening />
         </Series.Sequence>
-        <Series.Sequence name="0:12 Product & buyer" durationInFrames={S.product * fps} premountFor={fps}>
+        <Series.Sequence name="0:16 Product & buyer" durationInFrames={S.product * fps} premountFor={fps}>
           <Product />
         </Series.Sequence>
-        <Series.Sequence name="0:24 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
+        <Series.Sequence name="0:28 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
           <Demo />
         </Series.Sequence>
-        <Series.Sequence name="0:46 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
+        <Series.Sequence name="0:50 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
           <Architecture />
         </Series.Sequence>
-        <Series.Sequence name="0:58 Market" durationInFrames={S.market * fps} premountFor={fps}>
+        <Series.Sequence name="1:02 EU AI Act" durationInFrames={S.euact * fps} premountFor={fps}>
+          <EuAiAct />
+        </Series.Sequence>
+        <Series.Sequence name="1:12 Market" durationInFrames={S.market * fps} premountFor={fps}>
           <Market />
         </Series.Sequence>
-        <Series.Sequence name="1:12 Revenue & GTM" durationInFrames={S.revenue * fps} premountFor={fps}>
+        <Series.Sequence name="1:25 Revenue & GTM" durationInFrames={S.revenue * fps} premountFor={fps}>
           <Revenue />
         </Series.Sequence>
-        <Series.Sequence name="1:25 Differentiation" durationInFrames={S.different * fps} premountFor={fps}>
-          <Different />
-        </Series.Sequence>
-        <Series.Sequence name="1:39 Team" durationInFrames={S.team * fps} premountFor={fps}>
+        <Series.Sequence name="1:38 Team" durationInFrames={S.team * fps} premountFor={fps}>
           <TeamSlide {...teamSlideDefaults} />
           <Voiceover id="team" />
         </Series.Sequence>
-        <Series.Sequence name="1:49 Close" durationInFrames={S.close * fps} premountFor={fps}>
+        <Series.Sequence name="1:47 Ask & close" durationInFrames={S.close * fps} premountFor={fps}>
           <Close />
         </Series.Sequence>
       </Series>
@@ -78,7 +90,7 @@ export const Pitch: React.FC = () => {
           DRAFT
         </div>
       ) : null}
-      {media.music ? <Audio name="Music" src={staticFile("music.wav")} loop volume={0.07} premountFor={fps} /> : null}
+      {media.music ? <Audio name="Music" src={staticFile("music.wav")} loop volume={(f) => musicVolume(f, fps)} premountFor={fps} /> : null}
     </AbsoluteFill>
   );
 };

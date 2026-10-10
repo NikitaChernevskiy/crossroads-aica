@@ -54,13 +54,18 @@ const chunk = (words) => {
   return out;
 };
 
-const media = { voiceover: {}, demoFocused: false, demoTense: false, music: existsSync("public/music.wav") };
+const media = { voiceoverExpected: Object.keys(timeline).filter((id) => script[id]).length, voiceover: {}, demoFocused: false, demoTense: false, music: existsSync("public/music.wav") };
 const captions = [];
 let offset = 0;
 let problems = 0;
 let estimated = false;
 
 for (const [id, sceneSec] of Object.entries(timeline)) {
+  if (!script[id]) {
+    console.log(`  ${id.padEnd(12)} silent / scene ${sceneSec} s`);
+    offset += sceneSec;
+    continue;
+  }
   const mp3 = `public/voiceover/${id}.mp3`;
   const align = `public/voiceover/${id}.alignment.json`;
   let words;

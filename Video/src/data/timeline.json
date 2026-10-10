@@ -1,11 +1,12 @@
 {
+  "title": 4,
   "opening": 12,
   "product": 12,
   "demo": 22,
   "architecture": 12,
-  "market": 14,
+  "euact": 10,
+  "market": 13,
   "revenue": 13,
-  "different": 14,
-  "team": 10,
-  "close": 10
+  "team": 9,
+  "close": 12
 }

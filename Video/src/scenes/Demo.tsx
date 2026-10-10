@@ -5,12 +5,14 @@ import { Scene } from "../components/Scene";
 import config from "../data/config.json";
 import guidance from "../data/guidance.json";
 import media from "../data/media.json";
-import { colors, enter, monoFamily } from "../theme";
+import { Face } from "../components/Face";
+import { colors, enter, faces, monoFamily } from "../theme";
 
 const MAX_LINES = 4;
 
 const Half: React.FC<{
   readonly label: string;
+  readonly emoji: string;
   readonly accent: string;
   readonly indicators: string;
   readonly instructions: string[];
@@ -18,7 +20,7 @@ const Half: React.FC<{
   readonly available: boolean;
   readonly trimStart: number;
   readonly placeholder: { title: string; steps: string[] };
-}> = ({ label, accent, indicators, instructions, file, available, trimStart, placeholder }) => {
+}> = ({ label, emoji, accent, indicators, instructions, file, available, trimStart, placeholder }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
   const shown = instructions.slice(0, MAX_LINES);
@@ -73,8 +75,13 @@ const Half: React.FC<{
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24 }}>
         <Panel accent={accent} style={{ padding: 28, ...enter(frame, 0.4 * fps, fps, 20) }}>
           <div style={{ fontSize: 26, color: colors.muted }}>Estimated state · {config.demoInputLabel.toLowerCase()}</div>
-          <div style={{ fontSize: 52, fontWeight: 800, color: accent }}>{label}</div>
-          <div style={{ fontSize: 28, fontFamily: monoFamily, color: colors.muted }}>{indicators}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 6 }}>
+            <Face emoji={emoji} size={120} color={accent} start={0.5} />
+            <div>
+              <div style={{ fontSize: 44, fontWeight: 800, color: accent }}>{label}</div>
+              <div style={{ fontSize: 26, fontFamily: monoFamily, color: colors.muted }}>{indicators}</div>
+            </div>
+          </div>
         </Panel>
         <Panel style={{ padding: 28, flex: 1, ...enter(frame, 1.6 * fps, fps, 20) }}>
           <div style={{ fontSize: 26, color: colors.muted, fontFamily: monoFamily, marginBottom: 14 }}>
@@ -121,6 +128,7 @@ export const Demo: React.FC = () => {
       <Sequence name="Focused state" from={1 * fps} durationInFrames={11.5 * fps} premountFor={fps}>
         <Half
           label="Focused"
+          emoji={faces.focused}
           accent={colors.azure}
           indicators="stress 0.15 · focus 0.80"
           instructions={guidance.focused.instructions}
@@ -141,6 +149,7 @@ export const Demo: React.FC = () => {
       <Sequence name="Tense state" from={12.5 * fps} durationInFrames={9.5 * fps} premountFor={fps}>
         <Half
           label="Tense"
+          emoji={faces.tense}
           accent={colors.calm}
           indicators="stress 0.68 · focus 0.41"
           instructions={guidance.tense.instructions}

@@ -3,7 +3,8 @@ import { AiBubble, UserBubble } from "../components/Chat";
 import { Panel } from "../components/Panel";
 import { Note, Scene } from "../components/Scene";
 import config from "../data/config.json";
-import { colors, enter } from "../theme";
+import { Face } from "../components/Face";
+import { colors, enter, faces } from "../theme";
 
 export const FocusedAnswer: React.FC = () => (
   <>
@@ -27,10 +28,11 @@ export const CalmAnswer: React.FC = () => (
 
 const Side: React.FC<{
   readonly context: string;
+  readonly emoji: string;
   readonly accent: string;
   readonly start: number;
   readonly children: React.ReactNode;
-}> = ({ context, accent, start, children }) => {
+}> = ({ context, emoji, accent, start, children }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   return (
@@ -38,7 +40,10 @@ const Side: React.FC<{
       accent={accent}
       style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24, ...enter(frame, start * fps, fps) }}
     >
-      <div style={{ fontSize: 30, color: accent, fontWeight: 600 }}>{context}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <Face emoji={emoji} size={110} color={accent} start={start + 0.3} />
+        <div style={{ fontSize: 30, color: accent, fontWeight: 600 }}>{context}</div>
+      </div>
       <UserBubble>{config.demoQuestion}</UserBubble>
       <AiBubble style={enter(frame, (start + 1.6) * fps, fps, 20)}>{children}</AiBubble>
     </Panel>
@@ -55,10 +60,10 @@ export const Opening: React.FC = () => {
         Same question. <span style={{ color: colors.calm }}>Different needs.</span>
       </div>
       <div style={{ display: "flex", gap: 50, flex: 1 }}>
-        <Side context="Tuesday, 18:30 · focused, open to options" accent={colors.azure} start={0.3}>
+        <Side context="Tuesday, 18:30" emoji={faces.focused} accent={colors.azure} start={0.3}>
           <FocusedAnswer />
         </Side>
-        <Side context="Friday, 21:40 · overwhelmed" accent={colors.calm} start={3.6}>
+        <Side context="Friday, 21:40" emoji={faces.tense} accent={colors.calm} start={3.6}>
           <CalmAnswer />
         </Side>
       </div>

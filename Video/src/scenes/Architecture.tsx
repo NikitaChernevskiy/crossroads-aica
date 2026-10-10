@@ -1,7 +1,8 @@
 import { Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { Chip } from "../components/Panel";
 import { Eyebrow, Scene } from "../components/Scene";
-import { colors, enter, progress } from "../theme";
+import { Face } from "../components/Face";
+import { colors, enter, faces, progress } from "../theme";
 
 // Reference: crossroads-aica infra/main.bicep (Container Apps, Cosmos DB, Monitor) + backend MCP server.
 // Simplified for video: one left-to-right row, three hero services, two supporting ones.
@@ -180,15 +181,18 @@ const Small: React.FC<{ readonly icon: string; readonly name: string; readonly s
   );
 };
 
-const HeadBand: React.FC = () => (
-  <svg width={110} height={110} viewBox="0 0 110 110">
-    <circle cx={55} cy={48} r={30} fill="none" stroke={colors.text} strokeWidth={4} />
-    <path d="M18 108 C 22 82, 88 82, 92 108" fill="none" stroke={colors.text} strokeWidth={4} />
-    <path d="M24 44 C 30 14, 80 14, 86 44" fill="none" stroke={colors.violet} strokeWidth={7} strokeLinecap="round" />
-    <circle cx={28} cy={40} r={5} fill={colors.violet} />
-    <circle cx={82} cy={40} r={5} fill={colors.violet} />
-  </svg>
-);
+const Photo: React.FC<{ readonly src: string; readonly name: string; readonly start: number }> = ({ src, name, start }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, ...enter(frame, start * fps, fps, 12) }}>
+      <div style={{ width: 150, height: 104, borderRadius: 14, background: "#FFFFFF", overflow: "hidden", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <Img src={staticFile(src)} style={{ width: 150, height: 150, objectFit: "cover" }} />
+      </div>
+      <div style={{ fontSize: 19, fontWeight: 800 }}>{name}</div>
+    </div>
+  );
+};
 
 const Chip2: React.FC<{ readonly children: React.ReactNode; readonly color: string }> = ({ children, color }) => (
   <Chip color={color} style={{ fontSize: 20, padding: "6px 14px", gap: 6 }}>
@@ -206,8 +210,8 @@ const ExampleRow: React.FC<{ readonly emoji: string; readonly state: string; rea
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 22, fontSize: 36, ...enter(frame, start * fps, fps, 14) }}>
-      <span style={{ fontSize: 44 }}>{emoji}</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 22, fontSize: 36, height: 76, ...enter(frame, start * fps, fps, 14) }}>
+      <Face emoji={emoji} size={76} color={color} start={start} />
       <span style={{ fontWeight: 800, color, width: 190 }}>{state}</span>
       <span style={{ color: colors.muted }}>→</span>
       <span style={{ fontWeight: 600 }}>{reply}</span>
@@ -267,9 +271,9 @@ export const Architecture: React.FC = () => {
       <div style={{ opacity: rowDim }}>
         {/* Human + wearable */}
         <Node x={X.human} start={T.human} accent={colors.violet} active={active(T.human, T.local)}>
-          <HeadBand />
-          <Title size={26}>Muse S Athena</Title>
-          <Sub>EEG wearable + other EEG devices</Sub>
+          <Title size={24}>EEG wearables</Title>
+          <Photo src="muse-s-athena.jpg" name="Muse S Athena" start={T.human + 0.2} />
+          <Photo src="neurable-one.jpg" name="Neurable One" start={T.human + 0.5} />
           <div style={{ fontSize: 30, opacity: future, height: 30 * future }}>⌚ 💍</div>
         </Node>
         <Link from={X.human[1]} to={X.local[0]} start={T.wave} color={colors.violet} label="raw signals" wave />
@@ -380,8 +384,8 @@ export const Architecture: React.FC = () => {
         }}
       >
         <div style={{ fontSize: 22, color: colors.calm, fontWeight: 600, letterSpacing: 2 }}>MCP GUIDANCE SERVER · ESTIMATED STATE → AGENT INSTRUCTIONS</div>
-        <ExampleRow emoji="😰" state="Stressed" color={colors.stress} reply="Short, calm, step-by-step response" start={T.guidance + 0.3} />
-        <ExampleRow emoji="😌" state="Focused" color={colors.azure} reply="Detailed, structured explanation" start={T.guidance + 0.7} />
+        <ExampleRow emoji={faces.tense} state="Stressed" color={colors.stress} reply="Short, calm, step-by-step response" start={T.guidance + 0.3} />
+        <ExampleRow emoji={faces.focused} state="Focused" color={colors.azure} reply="Detailed, structured explanation" start={T.guidance + 0.7} />
       </div>
 
       {/* Vision: future research, clearly separated from the MVP */}

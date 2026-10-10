@@ -5,11 +5,12 @@ const read = (p) => JSON.parse(readFileSync(p, "utf8"));
 const config = read("src/data/config.json");
 const media = read("src/data/media.json");
 const timeline = read("src/data/timeline.json");
+const script = read("scripts/script.json");
 
 const issues = [];
 const total = Object.values(timeline).reduce((a, b) => a + b, 0);
 if (total > 120) issues.push(`Duration ${total} s exceeds 2:00`);
-for (const id of Object.keys(timeline)) if (!media.voiceover[id]) issues.push(`No narration for "${id}" (npm run voiceover)`);
+for (const id of Object.keys(timeline)) if (script[id] && !media.voiceover[id]) issues.push(`No narration for "${id}" (npm run voiceover)`);
 if (!media.demoFocused) issues.push("Missing public/demo-focused.mp4");
 if (!media.demoTense) issues.push("Missing public/demo-tense.mp4");
 if (!config.claudeContribution) issues.push("config.claudeContribution is empty");
