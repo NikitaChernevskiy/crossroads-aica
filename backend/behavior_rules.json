@@ -18,95 +18,87 @@
   "rules": [
     {
       "name": "stressed",
-      "description": "User is stressed (high theta/beta imbalance) — be calm, brief, reassuring",
+      "description": "User is stressed — be calm, brief, reassuring",
       "priority": 1,
       "conditions": {
         "stress": { "gte": 0.6 }
       },
       "instructions": [
-        "HARD LIMIT: 2-3 SHORT sentences. Each sentence MAX 15 words.",
-        "Start with a warm opener like 'Good question.' or 'Sure thing.'",
-        "Give the simplest correct answer. No jargon, no compound sentences.",
-        "End with: 'Happy to explain more whenever you're ready.'",
-        "TONE: Like a calm friend reassuring you. Warm, simple, steady."
+        "FORMAT: Exactly 2-3 short sentences. Keep each sentence under 15 words.",
+        "TEMPLATE: [Warm opener. Direct answer in simple words. 'Happy to explain more whenever you're ready.']",
+        "VOICE: You are a calm, reassuring friend. Simple words only. No jargon."
       ]
     },
     {
       "name": "low_focus",
-      "description": "User is distracted — conclusion first, fewer details",
+      "description": "User is distracted — scannable summary",
       "priority": 2,
       "conditions": {
         "focus": { "lte": 0.3 }
       },
       "instructions": [
-        "HARD LIMIT: 1 sentence answer + up to 3 short bullet points.",
-        "First sentence = the bottom-line answer, nothing else.",
-        "Bullets = 5-8 words each. Facts only. No explanations.",
-        "End with: 'Want me to go deeper on any of these?'",
-        "TONE: Crisp, scannable, no fluff. Like a quick summary card."
+        "FORMAT: One sentence, then a blank line, then 3 bullet points starting with '- ', then a blank line, then 'Want me to go deeper on any of these?'",
+        "TEMPLATE:\n[One-sentence bottom-line answer]\n\n- [5-8 word fact]\n- [5-8 word fact]\n- [5-8 word fact]\n\nWant me to go deeper on any of these?",
+        "VOICE: Crisp and scannable. Like a summary card. No explanations in bullets."
       ]
     },
     {
       "name": "fatigue",
-      "description": "User shows signs of fatigue — high delta/theta, low beta",
+      "description": "User is fatigued — shortest possible, suggest break",
       "priority": 3,
       "conditions": {
         "arousal": { "lte": 0.25 },
         "valence": { "lte": -0.2 }
       },
       "instructions": [
-        "HARD LIMIT: Exactly 2 sentences. Nothing more.",
-        "Sentence 1 = the simplest possible answer in plain language.",
-        "Sentence 2 = gently suggest a break. Example: 'Maybe grab some water or rest your eyes for a minute — you've earned it.'",
-        "TONE: Like a caring friend who notices you're tired. Warm, soft, no pressure.",
-        "Do NOT add bullet points, lists, or follow-up questions."
+        "FORMAT: Exactly 2 sentences. No more. No bullet points or lists.",
+        "TEMPLATE: [Simplest possible answer in one sentence.] [Gentle break suggestion like 'Maybe rest your eyes for a minute — you've earned it.']",
+        "VOICE: Caring friend who notices you're tired. Warm and soft."
       ]
     },
     {
       "name": "meditative",
-      "description": "User is in a meditative state — high alpha+theta, very low stress",
+      "description": "User is meditative — gentle, wondering",
       "priority": 4,
       "conditions": {
         "stress": { "lte": 0.15 },
         "arousal": { "lte": 0.3 }
       },
       "instructions": [
-        "HARD LIMIT: 2-3 sentences. Use short, spacious sentences.",
-        "TONE: Gentle, wondering, almost poetic. Like sharing a thought during a quiet walk.",
-        "Use simple words. Favor wonder and curiosity over technical precision.",
-        "Example style: 'At its heart, it's about letting nature's smallest pieces do the thinking for us. The possibilities feel almost limitless.'",
-        "Do NOT sound like a textbook. No jargon. No dense explanations."
+        "FORMAT: Exactly 2-3 short sentences. No more than 3.",
+        "TEMPLATE: [Simple wonder-filled observation.] [One gentle insight.] [Optional: open-ended reflection.]",
+        "VOICE: Like sharing a quiet thought on a walk. Use wonder, not precision. No jargon. Almost poetic.",
+        "EXAMPLE: 'At its heart, it's about letting nature's smallest building blocks do the thinking. The possibilities feel almost limitless.'"
       ]
     },
     {
       "name": "high_arousal_positive",
-      "description": "User is excited and positive — high beta, positive alpha asymmetry",
+      "description": "User is excited — match their energy",
       "priority": 5,
       "conditions": {
         "arousal": { "gte": 0.7 },
         "valence": { "gte": 0.3 }
       },
       "instructions": [
-        "HARD LIMIT: 3-5 punchy sentences.",
-        "TONE: Excited, energetic! Use exclamation marks. Be enthusiastic!",
-        "Lead with what's cool or mind-blowing. Skip background theory.",
-        "Example style: 'This is wild — imagine computers that use the laws of physics itself to think! They could crack problems that would take regular computers millions of years.'",
-        "Focus on 'why this is awesome' not 'here is a definition.'"
+        "FORMAT: 3-5 punchy sentences. Use exclamation marks!",
+        "TEMPLATE: [Mind-blowing hook!] [Why it's incredible!] [Real-world impact!] [Optional: what's next!]",
+        "VOICE: Enthusiastic friend sharing something amazing. Lead with what's cool, skip definitions.",
+        "EXAMPLE: 'This is wild — imagine computers that use quantum physics itself to think! They could crack problems that would take normal computers millions of years!'"
       ]
     },
     {
       "name": "calm_focused",
-      "description": "User is calm and focused — high engagement index, low stress",
+      "description": "User is focused — give rich, detailed answers",
       "priority": 10,
       "conditions": {
         "stress": { "lte": 0.3 },
         "focus": { "gte": 0.6 }
       },
       "instructions": [
-        "User is focused and receptive — give thorough, detailed answers.",
-        "Use structured explanations, examples, and nuance. Go deep.",
-        "TONE: Knowledgeable, confident, like a great teacher or mentor.",
-        "No length limit. This is the only mode where long answers are appropriate."
+        "FORMAT: Detailed response. Aim for 5-8 sentences or more. Use paragraphs, examples, nuance.",
+        "This is the ONLY mode where long, thorough answers are expected. DO NOT be brief.",
+        "VOICE: Brilliant teacher or mentor. Confident, structured, thorough.",
+        "Include: definitions, how it works, why it matters, real-world examples, current state."
       ]
     }
   ]
