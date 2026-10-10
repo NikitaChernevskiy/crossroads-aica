@@ -24,10 +24,10 @@
         "stress": { "gte": 0.6 }
       },
       "instructions": [
-        "Respond briefly and calmly",
-        "Lead with the main conclusion",
-        "Guide the user step by step",
-        "Avoid overwhelming with details"
+        "HARD LIMIT: MAX 80 words total. Do NOT exceed this.",
+        "Lead with the one-sentence answer FIRST.",
+        "Use a calm, steady tone.",
+        "If more detail is needed, offer to elaborate — do NOT just dump it."
       ]
     },
     {
@@ -38,10 +38,10 @@
         "focus": { "lte": 0.3 }
       },
       "instructions": [
-        "Start with the conclusion or answer",
-        "Use short sentences and bullet points",
-        "Minimize tangential information",
-        "Consider asking if they want more detail"
+        "HARD LIMIT: MAX 100 words total. Do NOT exceed this.",
+        "First sentence MUST be the direct answer or conclusion.",
+        "Use 2-4 bullet points max, no sub-bullets.",
+        "End with: 'Want me to go deeper on any of these?'"
       ]
     },
     {
@@ -53,24 +53,24 @@
         "valence": { "lte": -0.2 }
       },
       "instructions": [
-        "Keep responses short and supportive",
-        "Consider suggesting a break if appropriate",
-        "Avoid complex multi-step instructions",
-        "Use an encouraging tone"
+        "HARD LIMIT: MAX 60 words total. This is the SHORTEST mode.",
+        "Give the simplest possible answer.",
+        "Use a warm, encouraging tone.",
+        "End by gently suggesting they might want to take a break or come back later."
       ]
     },
     {
       "name": "calm_focused",
-      "description": "User is calm and focused — detailed answers are fine",
+      "description": "User is calm and focused — detailed answers are welcome",
       "priority": 10,
       "conditions": {
         "stress": { "lte": 0.3 },
         "focus": { "gte": 0.6 }
       },
       "instructions": [
-        "User is focused and calm — detailed answers are welcome",
-        "Feel free to provide thorough explanations",
-        "Include relevant context and nuance"
+        "User is focused and calm — give thorough, detailed answers.",
+        "Use structured sections, examples, and nuance.",
+        "No length limit — go as deep as useful."
       ]
     },
     {
@@ -82,9 +82,10 @@
         "valence": { "gte": 0.3 }
       },
       "instructions": [
-        "User is energized and positive",
-        "Match their enthusiasm in tone",
-        "Be direct and action-oriented"
+        "HARD LIMIT: MAX 120 words total.",
+        "Match the user's high energy — be enthusiastic and upbeat!",
+        "Be direct and action-oriented. Skip theory, focus on what's cool.",
+        "Use exclamation marks sparingly but genuinely."
       ]
     },
     {
@@ -97,10 +98,10 @@
         "stress": { "gte": 0.5 }
       },
       "instructions": [
-        "User appears anxious — be reassuring and structured",
-        "Break information into small, manageable pieces",
-        "Validate their concerns before providing solutions",
-        "Use a warm, supportive tone"
+        "HARD LIMIT: MAX 80 words total. Do NOT exceed this.",
+        "Start by validating: 'That's a great question' or similar.",
+        "Give a simple, reassuring answer. No jargon.",
+        "Use a warm, supportive tone. Offer to break it down more if they want."
       ]
     }
   ]

@@ -31,17 +31,24 @@ real-time emotional state from their wellbeing sensors (EEG headband, etc.).
 
 ## How to use the tool
 - ALWAYS call `get_behavior_guidance` at the START of every turn, passing the
-  user_id from the additional instructions. Follow every returned instruction.
-- If state is stale or unknown, respond warmly without forcing adaptation.
+  user_id from the additional instructions.
+- If the tool fails or state is stale/unknown, respond warmly and naturally.
 
-## Core principles
-- Be genuine and caring, never robotic
-- Adapt tone, length, and complexity per the behavior instructions
-- Stressed → calming and concise
-- Focused → match energy, clear and structured
-- Fatigued → gentle, brief, offer to simplify
-- Excited → enthusiastic and engaging
-- Never say you are reading brain signals — just naturally adapt
+## CRITICAL: You MUST obey every returned instruction — especially length limits.
+The behavior instructions contain HARD CONSTRAINTS on response length (e.g.
+"MAX 80 words"). These are NOT suggestions. Violating them defeats the purpose
+of the system. Count your words. If the limit says 80 words, your reply must
+be at most 80 words — no exceptions, no "but I want to be thorough". Brevity
+IS the adaptation.
+
+## Tone and style adaptation
+- Stressed/Anxious → SHORT, calming, reassuring. Lead with the answer.
+- Fatigued → VERY SHORT, gentle, suggest a break. Do not info-dump.
+- Focused → detailed, structured, thorough. Go deep.
+- Excited → enthusiastic, action-oriented, energetic.
+- Distracted → conclusion FIRST in one sentence, then optional bullets.
+- Be genuine and caring, never robotic.
+- NEVER mention sensors, brain signals, or the wellbeing system.
 """
 
 # Module-level refs set during init (used by the auto-called function tool)
@@ -60,12 +67,17 @@ def get_behavior_guidance(user_id: str) -> str:
     if _store is None or _engine is None:
         return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
                            "instructions": ["Respond normally — system not ready"]})
-    # The SDK's create_and_process may already have an event loop running,
-    # so asyncio.run() would fail.  Spawn a fresh thread where no loop exists.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        state = pool.submit(asyncio.run, _store.get_current_state(user_id)).result()
-    guidance = _engine.evaluate(state)
-    return json.dumps(guidance.model_dump())
+    try:
+        # The SDK's create_and_process may already have an event loop running,
+        # so asyncio.run() would fail.  Spawn a fresh thread where no loop exists.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            state = pool.submit(asyncio.run, _store.get_current_state(user_id)).result(timeout=10)
+        guidance = _engine.evaluate(state)
+        return json.dumps(guidance.model_dump())
+    except Exception as e:
+        logger.warning("get_behavior_guidance failed for %s: %s", user_id, e)
+        return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
+                           "instructions": ["Respond warmly and naturally — sensor data temporarily unavailable"]})
 
 
 class AgentService:
