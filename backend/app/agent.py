@@ -9,7 +9,6 @@ Architecture:
 """
 
 import asyncio
-import concurrent.futures
 import json
 import logging
 from typing import Optional
@@ -64,6 +63,9 @@ This is the most important rule. Each mood has a distinct personality:
 # Module-level refs set during init (used by the auto-called function tool)
 _store: StateStore | None = None
 _engine: BehaviorRulesEngine | None = None
+_main_loop: asyncio.AbstractEventLoop | None = None  # main event loop for cross-thread Cosmos calls
+_last_guidance_ok: bool = False  # tracks whether the last guidance call succeeded
+_last_state_label: str | None = None  # tracks the state label from the last successful guidance call
 
 
 def get_behavior_guidance(user_id: str) -> str:
@@ -74,15 +76,28 @@ def get_behavior_guidance(user_id: str) -> str:
     :param user_id: The user's identifier.
     :return: JSON with state, freshness, age_sec, and instructions list.
     """
+    global _last_guidance_ok, _last_state_label
+    _last_guidance_ok = False
+    _last_state_label = None
+
     if _store is None or _engine is None:
         return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
                            "instructions": ["Respond normally — system not ready"]})
     try:
-        # The SDK's create_and_process may already have an event loop running,
-        # so asyncio.run() would fail.  Spawn a fresh thread where no loop exists.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            state = pool.submit(asyncio.run, _store.get_current_state(user_id)).result(timeout=10)
+        # Schedule the async Cosmos query on the MAIN event loop (where the
+        # async CosmosClient was created).  Using asyncio.run() in a worker
+        # thread would create a NEW event loop, and the Cosmos aiohttp session
+        # is bound to the original loop — causing silent failures.
+        if _main_loop is None or _main_loop.is_closed():
+            raise RuntimeError("Main event loop not available")
+        future = asyncio.run_coroutine_threadsafe(
+            _store.get_current_state(user_id), _main_loop
+        )
+        state = future.result(timeout=10)
+
         guidance = _engine.evaluate(state)
+        _last_guidance_ok = guidance.fresh
+        _last_state_label = guidance.state if guidance.fresh else None
         logger.info(
             "[GUIDANCE] user=%s state=%s fresh=%s age=%ds instructions=%s",
             user_id, guidance.state, guidance.fresh, guidance.age_sec,
@@ -90,7 +105,7 @@ def get_behavior_guidance(user_id: str) -> str:
         )
         return json.dumps(guidance.model_dump())
     except Exception as e:
-        logger.warning("get_behavior_guidance failed for %s: %s", user_id, e)
+        logger.warning("get_behavior_guidance FAILED for %s: %s", user_id, e, exc_info=True)
         return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
                            "instructions": ["Respond warmly and naturally — sensor data temporarily unavailable"]})
 
@@ -99,9 +114,16 @@ class AgentService:
     """Manages the Foundry agent, threads, and function-tool integration."""
 
     def __init__(self, store: StateStore, engine: BehaviorRulesEngine) -> None:
-        global _store, _engine
+        global _store, _engine, _main_loop
         _store = store
         _engine = engine
+        # Capture the main event loop so get_behavior_guidance can schedule
+        # async Cosmos queries on it from the SDK's worker thread.
+        try:
+            _main_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            _main_loop = asyncio.get_event_loop()
+        logger.info("[AGENT] Captured main event loop: %s", _main_loop)
         self.client: AgentsClient | None = None
         self.agent_id: str | None = None
 
@@ -193,4 +215,4 @@ class AgentService:
 
         result_tid, response_text = await asyncio.to_thread(_sync_chat)
 
-        return result_tid, response_text, True, None
+        return result_tid, response_text, _last_guidance_ok, _last_state_label
