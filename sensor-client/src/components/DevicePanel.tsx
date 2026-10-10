@@ -3,6 +3,9 @@ import type { EmotionalState, SimulationProfile } from "../types";
 import { postState } from "../api";
 import { MuseClient, type MuseConnectionStatus } from "../lib/muse-client";
 import type { EmotionalMetrics } from "../lib/eeg-processor";
+import { LiveChart, type MetricSnapshot } from "./LiveChart";
+
+const MAX_CHART_POINTS = 60; // ~30s at 2 pts/sec
 
 const SIMULATION_PROFILES: SimulationProfile[] = [
   { name: "Calm & Focused", label: "focused", valence: 0.4, arousal: 0.35, focus: 0.8, stress: 0.15 },
@@ -14,6 +17,7 @@ const SIMULATION_PROFILES: SimulationProfile[] = [
 ];
 
 const SEND_INTERVAL_MS = 10_000;
+const CHART_TICK_MS = 500; // chart updates at 2 pts/sec (matches Muse EEG compute rate)
 
 function isWebBluetoothSupported(): boolean {
   return typeof navigator !== "undefined" && "bluetooth" in navigator;
@@ -31,6 +35,8 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
   const [mode, setMode] = useState<"simulation" | "bluetooth">("simulation");
   const [activeProfile, setActiveProfile] = useState<SimulationProfile>(SIMULATION_PROFILES[0]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chartTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeProfileRef = useRef<SimulationProfile>(SIMULATION_PROFILES[0]);
 
   // Bluetooth state
   const [btStatus, setBtStatus] = useState<MuseConnectionStatus>("disconnected");
@@ -40,22 +46,44 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
   const btSendRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const latestMetricsRef = useRef<EmotionalMetrics | null>(null);
 
-  // ── Simulation Mode ─────────────────────────────────────────────────────
+  // Live chart data (rolling buffer of recent EEG metrics)
+  const [chartData, setChartData] = useState<MetricSnapshot[]>([]);
 
+  // Keep profile ref in sync for the fast chart ticker
+  useEffect(() => { activeProfileRef.current = activeProfile; }, [activeProfile]);
+
+  // ── Simulation helpers ──────────────────────────────────────────────────
+
+  const jitter = () => (Math.random() - 0.5) * 0.1;
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+  /** Generate a jittered snapshot from a profile (chart-only, no API call). */
+  const pushChartPoint = useCallback((profile: SimulationProfile) => {
+    setChartData((prev) => {
+      const next = [...prev, {
+        valence: clamp(profile.valence + jitter(), -1, 1),
+        arousal: clamp(profile.arousal + jitter(), 0, 1),
+        focus: clamp(profile.focus + jitter(), 0, 1),
+        stress: clamp(profile.stress + jitter(), 0, 1),
+        timestamp: Date.now(),
+      }];
+      return next.length > MAX_CHART_POINTS ? next.slice(-MAX_CHART_POINTS) : next;
+    });
+  }, []);
+
+  /** Send state to backend API + update parent (runs at slower SEND_INTERVAL_MS). */
   const sendState = useCallback(
     async (profile: SimulationProfile) => {
-      const jitter = () => (Math.random() - 0.5) * 0.1;
-      const clamp = (v: number, min: number, max: number) =>
-        Math.max(min, Math.min(max, v));
+      const v = clamp(profile.valence + jitter(), -1, 1);
+      const a = clamp(profile.arousal + jitter(), 0, 1);
+      const f = clamp(profile.focus + jitter(), 0, 1);
+      const s = clamp(profile.stress + jitter(), 0, 1);
 
       const state: EmotionalState = {
         user_id: userId,
         source: "simulation",
         timestamp: new Date().toISOString(),
-        valence: clamp(profile.valence + jitter(), -1, 1),
-        arousal: clamp(profile.arousal + jitter(), 0, 1),
-        focus: clamp(profile.focus + jitter(), 0, 1),
-        stress: clamp(profile.stress + jitter(), 0, 1),
+        valence: v, arousal: a, focus: f, stress: s,
         label: profile.label,
       };
 
@@ -71,12 +99,28 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
 
   const startSending = useCallback(
     (profile: SimulationProfile) => {
+      // Clear previous intervals
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (chartTickRef.current) clearInterval(chartTickRef.current);
+      setChartData([]);
+
+      // Fast chart ticker — 2 pts/sec to mimic Muse EEG compute rate
+      pushChartPoint(profile);
+      chartTickRef.current = setInterval(
+        () => pushChartPoint(activeProfileRef.current),
+        CHART_TICK_MS
+      );
+
+      // Slow backend sender — every 10s
       sendState(profile);
-      intervalRef.current = setInterval(() => sendState(profile), SEND_INTERVAL_MS);
+      intervalRef.current = setInterval(
+        () => sendState(activeProfileRef.current),
+        SEND_INTERVAL_MS
+      );
+
       onConnect();
     },
-    [sendState, onConnect]
+    [sendState, pushChartPoint, onConnect]
   );
 
   const stopSending = useCallback(() => {
@@ -84,6 +128,11 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (chartTickRef.current) {
+      clearInterval(chartTickRef.current);
+      chartTickRef.current = null;
+    }
+    setChartData([]);
     onDisconnect();
   }, [onDisconnect]);
 
@@ -142,6 +191,17 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
       },
       onMetrics: (metrics) => {
         latestMetricsRef.current = metrics;
+        // Push to live chart buffer
+        setChartData((prev) => {
+          const next = [...prev, {
+            valence: metrics.valence,
+            arousal: metrics.arousal,
+            focus: metrics.focus,
+            stress: metrics.stress,
+            timestamp: Date.now(),
+          }];
+          return next.length > MAX_CHART_POINTS ? next.slice(-MAX_CHART_POINTS) : next;
+        });
         const state: EmotionalState = {
           user_id: userId,
           source: "muse-s-athena",
@@ -163,6 +223,7 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
     museRef.current?.disconnect();
     museRef.current = null;
     latestMetricsRef.current = null;
+    setChartData([]);
     if (btSendRef.current) {
       clearInterval(btSendRef.current);
       btSendRef.current = null;
@@ -175,6 +236,7 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      if (chartTickRef.current) clearInterval(chartTickRef.current);
       if (btSendRef.current) clearInterval(btSendRef.current);
       museRef.current?.disconnect();
     };
@@ -184,6 +246,7 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
     if (newMode === mode) return;
     if (mode === "simulation" && connected) stopSending();
     if (mode === "bluetooth" && btStatus === "connected") disconnectBluetooth();
+    setChartData([]);
     setMode(newMode);
   };
 
@@ -239,6 +302,8 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
               </button>
             ))}
           </div>
+
+          {connected && <LiveChart data={chartData} height={110} />}
 
           {!connected ? (
             <button
@@ -301,6 +366,10 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
                 <p>Supports Muse 2 and Muse S (Athena) headbands</p>
                 <p>Turn on your headband and ensure it&apos;s not connected to another device</p>
               </div>
+
+              {btStatus === "connected" && (
+                <LiveChart data={chartData} height={110} />
+              )}
 
               {btStatus !== "connected" ? (
                 <button
