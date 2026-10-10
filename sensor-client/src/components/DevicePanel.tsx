@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { EmotionalState, SimulationProfile } from "../types";
 import { postState } from "../api";
+import { MuseClient, type MuseConnectionStatus } from "../lib/muse-client";
+import type { EmotionalMetrics } from "../lib/eeg-processor";
 
 const SIMULATION_PROFILES: SimulationProfile[] = [
   { name: "Calm & Focused", label: "calm", valence: 0.4, arousal: 0.3, focus: 0.8, stress: 0.15 },
@@ -11,7 +13,11 @@ const SIMULATION_PROFILES: SimulationProfile[] = [
   { name: "Distracted", label: "distracted", valence: 0.0, arousal: 0.4, focus: 0.15, stress: 0.3 },
 ];
 
-const SEND_INTERVAL_MS = 10_000; // Send state every 10 seconds
+const SEND_INTERVAL_MS = 10_000;
+
+function isWebBluetoothSupported(): boolean {
+  return typeof navigator !== "undefined" && "bluetooth" in navigator;
+}
 
 interface Props {
   connected: boolean;
@@ -26,16 +32,25 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
   const [activeProfile, setActiveProfile] = useState<SimulationProfile>(SIMULATION_PROFILES[0]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Bluetooth state
+  const [btStatus, setBtStatus] = useState<MuseConnectionStatus>("disconnected");
+  const [btError, setBtError] = useState<string | null>(null);
+  const [deviceName, setDeviceName] = useState<string>("");
+  const museRef = useRef<MuseClient | null>(null);
+  const btSendRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const latestMetricsRef = useRef<EmotionalMetrics | null>(null);
+
+  // ── Simulation Mode ─────────────────────────────────────────────────────
+
   const sendState = useCallback(
     async (profile: SimulationProfile) => {
-      // Add small random jitter to make it look natural
       const jitter = () => (Math.random() - 0.5) * 0.1;
       const clamp = (v: number, min: number, max: number) =>
         Math.max(min, Math.min(max, v));
 
       const state: EmotionalState = {
         user_id: userId,
-        source: mode === "simulation" ? "simulation" : "muse-s-athena",
+        source: "simulation",
         timestamp: new Date().toISOString(),
         valence: clamp(profile.valence + jitter(), -1, 1),
         arousal: clamp(profile.arousal + jitter(), 0, 1),
@@ -51,13 +66,12 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
         console.error("Failed to send state:", err);
       }
     },
-    [userId, mode, onStateUpdate]
+    [userId, onStateUpdate]
   );
 
   const startSending = useCallback(
     (profile: SimulationProfile) => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      // Send immediately, then on interval
       sendState(profile);
       intervalRef.current = setInterval(() => sendState(profile), SEND_INTERVAL_MS);
       onConnect();
@@ -73,20 +87,109 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
     onDisconnect();
   }, [onDisconnect]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
   const handleProfileChange = (profile: SimulationProfile) => {
     setActiveProfile(profile);
-    if (connected) {
-      // Restart with new profile
+    if (connected && mode === "simulation") {
       startSending(profile);
     }
   };
+
+  // ── Bluetooth Mode ──────────────────────────────────────────────────────
+
+  const sendMuseState = useCallback(
+    async (metrics: EmotionalMetrics) => {
+      const state: EmotionalState = {
+        user_id: userId,
+        source: "muse-s-athena",
+        timestamp: new Date().toISOString(),
+        valence: metrics.valence,
+        arousal: metrics.arousal,
+        focus: metrics.focus,
+        stress: metrics.stress,
+        label: metrics.label,
+      };
+
+      try {
+        await postState(state);
+        onStateUpdate(state);
+      } catch (err) {
+        console.error("Failed to send Muse state:", err);
+      }
+    },
+    [userId, onStateUpdate]
+  );
+
+  const connectBluetooth = useCallback(async () => {
+    setBtError(null);
+
+    const client = new MuseClient({
+      onStatusChange: (status) => {
+        setBtStatus(status);
+        if (status === "connected") {
+          setDeviceName(client.deviceName);
+          onConnect();
+          btSendRef.current = setInterval(() => {
+            const m = latestMetricsRef.current;
+            if (m) sendMuseState(m);
+          }, SEND_INTERVAL_MS);
+        } else if (status === "disconnected") {
+          if (btSendRef.current) {
+            clearInterval(btSendRef.current);
+            btSendRef.current = null;
+          }
+          onDisconnect();
+        }
+      },
+      onMetrics: (metrics) => {
+        latestMetricsRef.current = metrics;
+        const state: EmotionalState = {
+          user_id: userId,
+          source: "muse-s-athena",
+          timestamp: new Date().toISOString(),
+          ...metrics,
+        };
+        onStateUpdate(state);
+      },
+      onError: (error) => {
+        setBtError(error);
+      },
+    });
+
+    museRef.current = client;
+    await client.connect();
+  }, [userId, onConnect, onDisconnect, onStateUpdate, sendMuseState]);
+
+  const disconnectBluetooth = useCallback(() => {
+    museRef.current?.disconnect();
+    museRef.current = null;
+    latestMetricsRef.current = null;
+    if (btSendRef.current) {
+      clearInterval(btSendRef.current);
+      btSendRef.current = null;
+    }
+    onDisconnect();
+  }, [onDisconnect]);
+
+  // ── Cleanup ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (btSendRef.current) clearInterval(btSendRef.current);
+      museRef.current?.disconnect();
+    };
+  }, []);
+
+  const handleModeSwitch = (newMode: "simulation" | "bluetooth") => {
+    if (newMode === mode) return;
+    if (mode === "simulation" && connected) stopSending();
+    if (mode === "bluetooth" && btStatus === "connected") disconnectBluetooth();
+    setMode(newMode);
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────
+
+  const btSupported = isWebBluetoothSupported();
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900 p-5">
@@ -97,7 +200,7 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
       {/* Mode selector */}
       <div className="flex gap-2 mb-4">
         <button
-          onClick={() => setMode("simulation")}
+          onClick={() => handleModeSwitch("simulation")}
           className={`flex-1 text-sm py-2 rounded-lg transition ${
             mode === "simulation"
               ? "bg-indigo-600 text-white"
@@ -107,7 +210,7 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
           Simulation
         </button>
         <button
-          onClick={() => setMode("bluetooth")}
+          onClick={() => handleModeSwitch("bluetooth")}
           className={`flex-1 text-sm py-2 rounded-lg transition ${
             mode === "bluetooth"
               ? "bg-indigo-600 text-white"
@@ -137,7 +240,6 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
             ))}
           </div>
 
-          {/* Connect/Disconnect */}
           {!connected ? (
             <button
               onClick={() => startSending(activeProfile)}
@@ -155,17 +257,73 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
           )}
         </>
       ) : (
-        <div className="text-sm text-gray-500 text-center py-8">
-          <p className="mb-2">Web Bluetooth to Muse S Athena</p>
-          <p className="text-xs text-gray-600">
-            Requires Chrome/Edge on desktop or Android
-          </p>
-          <button
-            disabled
-            className="mt-4 w-full py-2.5 rounded-lg bg-gray-800 text-gray-500 text-sm cursor-not-allowed"
-          >
-            Connect Headband (coming soon)
-          </button>
+        <div className="space-y-3">
+          {!btSupported ? (
+            <div className="text-sm text-amber-400 bg-amber-900/20 border border-amber-800 rounded-lg p-3">
+              <p className="font-medium mb-1">Web Bluetooth Not Available</p>
+              <p className="text-xs text-amber-300/70">
+                Use Chrome or Edge on desktop or Android. Safari and Firefox do not support Web Bluetooth.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Status */}
+              <div className="flex items-center gap-2 text-sm">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    btStatus === "connected"
+                      ? "bg-green-400"
+                      : btStatus === "connecting"
+                      ? "bg-amber-400 animate-pulse"
+                      : btStatus === "error"
+                      ? "bg-red-400"
+                      : "bg-gray-600"
+                  }`}
+                />
+                <span className="text-gray-400">
+                  {btStatus === "connected"
+                    ? `Connected to ${deviceName}`
+                    : btStatus === "connecting"
+                    ? "Connecting..."
+                    : btStatus === "error"
+                    ? "Connection error"
+                    : "Ready to connect"}
+                </span>
+              </div>
+
+              {btError && (
+                <div className="text-xs text-red-400 bg-red-900/20 border border-red-800 rounded-lg p-2">
+                  {btError}
+                </div>
+              )}
+
+              <div className="text-xs text-gray-500 bg-gray-800/50 rounded-lg p-3 space-y-1">
+                <p>Supports Muse 2 and Muse S (Athena) headbands</p>
+                <p>Turn on your headband and ensure it&apos;s not connected to another device</p>
+              </div>
+
+              {btStatus !== "connected" ? (
+                <button
+                  onClick={connectBluetooth}
+                  disabled={btStatus === "connecting"}
+                  className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium transition"
+                >
+                  {btStatus === "connecting" ? (
+                    <span className="animate-pulse">Connecting...</span>
+                  ) : (
+                    "Connect Headband"
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={disconnectBluetooth}
+                  className="w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition"
+                >
+                  Disconnect
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

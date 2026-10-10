@@ -54,6 +54,21 @@ class StateResponse(BaseModel):
     id: str = Field(..., description="Stored document ID")
 
 
+class ChatRequest(BaseModel):
+    """Chat request from the frontend."""
+
+    user_id: str = Field(..., description="User identifier")
+    message: str = Field(..., min_length=1, max_length=4000, description="User message")
+
+
+class ChatResponse(BaseModel):
+    """Chat response with AI-generated text."""
+
+    response: str = Field(..., description="AI-generated response")
+    guidance_used: bool = Field(..., description="Whether behavior guidance was applied")
+    state_label: Optional[str] = Field(None, description="Emotional state label used")
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
 

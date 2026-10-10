@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     # Use in-memory storage when Cosmos DB is not configured (local dev)
     use_in_memory: bool = True
 
+    # Azure OpenAI
+    azure_openai_endpoint: str = ""
+    azure_openai_key: str = ""
+    azure_openai_deployment: str = "gpt-4-1-nano"
+    azure_openai_api_version: str = "2024-12-01-preview"
+
     # Key Vault (optional — used in production)
     keyvault_url: str = ""
 
