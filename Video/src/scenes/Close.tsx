@@ -56,6 +56,9 @@ const FinalCard: React.FC = () => {
         </span>
       </div>
       <div style={{ fontSize: 64, fontWeight: 800, marginTop: 30, ...enter(frame, 1.2 * fps, fps) }}>AI Emotional Partner</div>
+      <div style={{ fontSize: 40, fontWeight: 600, color: colors.calm, fontFamily: monoFamily, ...enter(frame, 1.4 * fps, fps) }}>
+        {config.websiteUrl}
+      </div>
       <div style={{ fontSize: 32, color: colors.muted, ...enter(frame, 1.6 * fps, fps) }}>
         {config.teamName} · <span style={{ fontFamily: monoFamily }}>{config.repoUrl}</span>
       </div>
