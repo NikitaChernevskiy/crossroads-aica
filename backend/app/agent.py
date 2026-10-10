@@ -152,11 +152,17 @@ class AgentService:
                 return tid, f"I had trouble processing that. ({err})"
 
             # Get assistant's response (returns MessageTextContent | None)
+            # MessageTextContent.text is a MessageText with .value and .annotations
             msg = self.client.messages.get_last_message_text_by_role(  # type: ignore[union-attr]
                 thread_id=tid, role="assistant"
             )
-            text = msg.text if msg else "I'm here for you."
-            return tid, str(text)
+            if msg and hasattr(msg.text, "value"):
+                text = msg.text.value
+            elif msg:
+                text = str(msg.text)
+            else:
+                text = "I'm here for you."
+            return tid, text
 
         result_tid, response_text = await asyncio.to_thread(_sync_chat)
 
