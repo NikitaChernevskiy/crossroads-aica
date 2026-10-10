@@ -1,8 +1,9 @@
 """AI Emotional Partner — FastAPI backend + MCP server.
 
-Serves two purposes in one process:
-  1. REST API: POST /state (ingest), GET /state/{user_id} (current), GET /health
+Serves three purposes in one process:
+  1. REST API: POST /state, GET /state/{user_id}, GET /health, POST /chat
   2. MCP Server: streamable HTTP at /mcp (get_behavior_guidance, get_emotional_state, get_state_history)
+  3. AI Agent Service: Azure AI Foundry Assistant with function-tool calls + threads for chat history
 """
 
 import logging
@@ -12,6 +13,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncAzureOpenAI
 
+from app.agent import AgentService
 from app.config import settings
 from app.cosmos import create_store
 from app.mcp_tools import init_mcp, mcp_server
@@ -29,25 +31,27 @@ logger = logging.getLogger(__name__)
 # Shared instances
 store = create_store()
 engine = BehaviorRulesEngine()
-oai_client: AsyncAzureOpenAI | None = None
+agent_service: AgentService | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle."""
-    global oai_client
+    global agent_service
     # Initialize store (Cosmos DB connection or in-memory)
     await store.initialize()
     # Wire MCP tools to the shared store and engine
     init_mcp(store, engine)
-    # Initialize Azure OpenAI client
+    # Initialize AI Foundry Agent Service
     if settings.azure_openai_endpoint and settings.azure_openai_key:
         oai_client = AsyncAzureOpenAI(
             azure_endpoint=settings.azure_openai_endpoint,
             api_key=settings.azure_openai_key,
             api_version=settings.azure_openai_api_version,
         )
-        logger.info("Azure OpenAI client initialized (deployment=%s)", settings.azure_openai_deployment)
+        agent_service = AgentService(oai_client, store, engine)
+        await agent_service.initialize()
+        logger.info("AI Foundry Agent Service initialized (assistant=%s)", agent_service.assistant_id)
     else:
         logger.warning("Azure OpenAI not configured — /chat endpoint will be unavailable")
     yield
@@ -113,73 +117,38 @@ async def reload_rules():
     return {"status": "ok", "message": "Rules reloaded"}
 
 
-# ── Chat Endpoint ────────────────────────────────────────────────────────────────
-
-SYSTEM_PROMPT_BASE = """You are an empathetic AI assistant powered by the AI Emotional Partner system.
-You have access to real-time emotional context from the user's wellbeing sensors (EEG headband, etc.).
-Your role is to be helpful, warm, and adaptive — adjusting your communication style based on the
-user's current emotional and cognitive state.
-
-Key principles:
-- Be genuine and caring, never robotic
-- Adapt your tone, length, and complexity to the user's state
-- If the user is stressed, be calming and concise
-- If the user is focused, match their energy with clear, structured responses
-- If the user is fatigued, be gentle and offer to simplify
-- Never explicitly mention you are reading their brain signals — just naturally adapt
-"""
+# ── Chat Endpoint (AI Foundry Agent Service) ──────────────────────────────────
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest):
-    """Chat endpoint — AI responds adapted to the user's emotional state.
+    """Chat via AI Foundry Agent Service.
 
     Flow:
-    1. Fetch current emotional state from store
-    2. Evaluate behavior guidance via rules engine
-    3. Inject guidance into system prompt
-    4. Call Azure OpenAI for completion
-    5. Return response
+    1. Create or reuse a Thread (conversation history is kept server-side)
+    2. Add user message to the thread
+    3. Run the Assistant — it calls get_behavior_guidance tool automatically
+    4. Return adapted response + thread_id for subsequent messages
     """
-    if oai_client is None:
+    if agent_service is None:
         raise HTTPException(
             status_code=503,
-            detail="Azure OpenAI not configured. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY.",
+            detail="AI Agent Service not configured. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY.",
         )
 
-    # 1. Get behavior guidance for this user
-    state = await store.get_current_state(req.user_id)
-    guidance = engine.evaluate(state)
-
-    # 2. Build system prompt with injected guidance
-    guidance_block = "\n".join(f"- {instr}" for instr in guidance.instructions)
-    system_prompt = (
-        f"{SYSTEM_PROMPT_BASE}\n"
-        f"## Current User State\n"
-        f"- Emotional state: {guidance.state}\n"
-        f"- Data freshness: {'fresh' if guidance.fresh else 'stale'} ({guidance.age_sec}s ago)\n\n"
-        f"## Behavior Instructions (follow these)\n"
-        f"{guidance_block}\n"
-    )
-
-    # 3. Call Azure OpenAI
     try:
-        completion = await oai_client.chat.completions.create(
-            model=settings.azure_openai_deployment,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": req.message},
-            ],
-            max_tokens=800,
-            temperature=0.7,
+        thread_id, response_text, guidance_used, state_label = await agent_service.chat(
+            user_id=req.user_id,
+            message=req.message,
+            thread_id=req.thread_id,
         )
-        response_text = completion.choices[0].message.content or "I'm here for you."
     except Exception as e:
-        logger.error("Azure OpenAI call failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"AI service error: {e}") from e
+        logger.error("Agent service error: %s", e)
+        raise HTTPException(status_code=502, detail=f"AI Agent error: {e}") from e
 
     return ChatResponse(
         response=response_text,
-        guidance_used=guidance.fresh,
-        state_label=guidance.state if guidance.state != "unknown" else None,
+        thread_id=thread_id,
+        guidance_used=guidance_used,
+        state_label=state_label,
     )

@@ -59,12 +59,14 @@ class ChatRequest(BaseModel):
 
     user_id: str = Field(..., description="User identifier")
     message: str = Field(..., min_length=1, max_length=4000, description="User message")
+    thread_id: Optional[str] = Field(None, description="Thread ID for conversation continuity (omit for new chat)")
 
 
 class ChatResponse(BaseModel):
     """Chat response with AI-generated text."""
 
     response: str = Field(..., description="AI-generated response")
+    thread_id: str = Field(..., description="Thread ID — send this back in subsequent messages")
     guidance_used: bool = Field(..., description="Whether behavior guidance was applied")
     state_label: Optional[str] = Field(None, description="Emotional state label used")
 

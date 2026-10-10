@@ -25,17 +25,28 @@ export async function getCurrentState(
   return resp.json();
 }
 
+/** Chat response from the backend. */
+export interface ChatResult {
+  response: string;
+  thread_id: string;
+  guidance_used: boolean;
+  state_label: string | null;
+}
+
 /** Send a chat message to the backend and get a response. */
 export async function sendChatMessage(
   userId: string,
-  message: string
-): Promise<string> {
+  message: string,
+  threadId?: string | null
+): Promise<ChatResult> {
+  const body: Record<string, string> = { user_id: userId, message };
+  if (threadId) body.thread_id = threadId;
+
   const resp = await fetch(`${API_BASE}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, message }),
+    body: JSON.stringify(body),
   });
   if (!resp.ok) throw new Error(`POST /chat failed: ${resp.status}`);
-  const data = await resp.json();
-  return data.response;
+  return resp.json();
 }

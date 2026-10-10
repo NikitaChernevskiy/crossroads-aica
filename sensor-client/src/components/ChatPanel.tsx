@@ -10,12 +10,20 @@ export function ChatPanel({ userId }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [stateLabel, setStateLabel] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setThreadId(null);
+    setStateLabel(null);
+  };
 
   const handleSend = async () => {
     const text = input.trim();
@@ -32,11 +40,13 @@ export function ChatPanel({ userId }: Props) {
     setLoading(true);
 
     try {
-      const response = await sendChatMessage(userId, text);
+      const result = await sendChatMessage(userId, text, threadId);
+      setThreadId(result.thread_id);
+      if (result.state_label) setStateLabel(result.state_label);
       const assistantMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: response,
+        content: result.response,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
@@ -44,7 +54,7 @@ export function ChatPanel({ userId }: Props) {
       const errorMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: `Error: ${err instanceof Error ? err.message : "Failed to get response"}. Make sure the backend is running and a /chat endpoint is available.`,
+        content: `Error: ${err instanceof Error ? err.message : "Failed to get response"}. Make sure the backend is running.`,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -56,13 +66,24 @@ export function ChatPanel({ userId }: Props) {
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900 flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
-          Chat
-        </h2>
-        <p className="text-xs text-gray-500 mt-1">
-          The AI adapts its responses based on your emotional state
-        </p>
+      <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
+            Chat
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            {stateLabel
+              ? `Adapting to: ${stateLabel}`
+              : "The AI adapts its responses based on your emotional state"}
+          </p>
+        </div>
+        <button
+          onClick={handleNewChat}
+          disabled={messages.length === 0}
+          className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition"
+        >
+          New Chat
+        </button>
       </div>
 
       {/* Messages */}
