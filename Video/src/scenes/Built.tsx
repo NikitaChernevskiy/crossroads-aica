@@ -47,7 +47,18 @@ export const Built: React.FC = () => {
         <div style={{ fontSize: 64, fontWeight: 800, marginTop: 8 }}>Built with AI, for AI agents</div>
       </div>
       <div style={{ display: "flex", gap: 26 }}>
-        <Tool icon="azure" name="Azure SRE Agent" what="Backend, MCP server, Azure infra, CI/CD" start={0.6} />
+        <Tool
+          icon="azure"
+          name="Azure SRE Agent"
+          what={
+            <>
+              Backend, MCP server, Azure infra, CI/CD
+              <br />
+              <span style={{ color: colors.calm, fontWeight: 600 }}>running on an Anthropic Claude model</span>
+            </>
+          }
+          start={0.6}
+        />
         <Tool icon="foundry" name="Microsoft Foundry" what="Agent Service + MCP tool call" start={1.1} />
         <Tool emoji="✳️" name="Claude Code" what="This pitch video + narration pipeline" start={1.6} />
         <Tool emoji="💜" name="Lovable" what={config.lovableContribution || <Todo>what Lovable built</Todo>} start={2.1} />

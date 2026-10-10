@@ -13,7 +13,7 @@ Hackathon theme: **AI That Does the Work**: "Don’t rebuild the agent. Build wh
 | 0:16–0:27 | Product | Theme fit + buyer | "We don’t rebuild the agent. We give it what it can’t know." 😰 person + large Muse S Athena and Neurable One photos → AI Emotional Partner (one MCP tool) → any AI agent (wellbeing apps first) |
 | 0:27–0:49 | Demo | Working prototype | Two recordings (😊 focused, 😰 tense) + estimated state + **real** `get_behavior_guidance` output. 7 s of spare runtime can extend this when real clips exist |
 | 0:49–1:01 | Architecture | AI use | Wearables → local processing → Azure (Container Apps + MCP Guidance Server, Cosmos DB, Entra, Monitor) → Foundry → response; future-research panel |
-| 1:01–1:10 | How we built it | "Explain how you built it" | Azure SRE Agent (backend, MCP, infra, CI/CD) · Microsoft Foundry · Claude Code (this video) · Lovable (placeholder) |
+| 1:01–1:10 | How we built it | "Explain how you built it" | Azure SRE Agent running on an Anthropic Claude model (backend, MCP, infra, CI/CD) · Microsoft Foundry · Claude Code (this video) · Lovable (placeholder) |
 | 1:10–1:20 | EU AI Act | Trust | GDPR · Art. 50 · Art. 5 · Annex III design commitments |
 | 1:20–1:33 | Business | Beachhead + model | Wellbeing apps with wearables, $4.5B category context, B2B subscription + usage (proposed), then any agent that works for people |
 | 1:33–1:42 | Team (`TeamSlide`) | Credibility | Three team cards |
