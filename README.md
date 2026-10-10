@@ -4,7 +4,7 @@
 
 Built for the [CrossRoads AI Hackathon Bulgaria 2026](https://www.startupbulgaria.eu/crossroads/ai-hackathon) by **AI Cloud Agency**.
 
-🎬 **Pitch & demo video:** source project in [`Video/`](Video/), built with Claude Code and [Remotion](https://www.remotion.dev/). See [Video/README.md](Video/README.md) for the storyboard, sources and how to render it.
+🎬 **Pitch & demo video:** [watch the final video](https://github.com/NikitaChernevskiy/crossroads-aica/releases/tag/pitch-video-final) · 🌐 [landing page](https://landing-sparkle-maker-25.lovable.app) · source project in [`Video/`](Video/), built with Claude Code and [Remotion](https://www.remotion.dev/). See [Video/README.md](Video/README.md) for the storyboard, sources and how to render it.
 
 ---
 
