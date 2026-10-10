@@ -1,0 +1,15 @@
+# AI Emotional Partner — Local Development
+# Usage: docker compose up --build
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - USE_IN_MEMORY=true
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - STATE_FRESHNESS_SECONDS=300
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

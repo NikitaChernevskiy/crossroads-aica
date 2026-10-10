@@ -1,0 +1,107 @@
+{
+  "version": "1.0.0",
+  "description": "Behavior rules for AI Emotional Partner — maps emotional state to agent instructions",
+
+  "default_instructions": [
+    "Respond normally — no emotional context available"
+  ],
+
+  "stale_instructions": [
+    "State data is stale — respond normally",
+    "Optionally mention that the wellbeing device may be disconnected"
+  ],
+
+  "default_fresh_instructions": [
+    "User appears balanced — respond with normal detail and tone"
+  ],
+
+  "rules": [
+    {
+      "name": "high_stress",
+      "description": "User is stressed — be calm, brief, step-by-step",
+      "priority": 1,
+      "conditions": {
+        "stress": { "gte": 0.6 }
+      },
+      "instructions": [
+        "Respond briefly and calmly",
+        "Lead with the main conclusion",
+        "Guide the user step by step",
+        "Avoid overwhelming with details"
+      ]
+    },
+    {
+      "name": "low_focus",
+      "description": "User is distracted — conclusion first, fewer details",
+      "priority": 2,
+      "conditions": {
+        "focus": { "lte": 0.3 }
+      },
+      "instructions": [
+        "Start with the conclusion or answer",
+        "Use short sentences and bullet points",
+        "Minimize tangential information",
+        "Consider asking if they want more detail"
+      ]
+    },
+    {
+      "name": "fatigue",
+      "description": "User shows signs of fatigue — low arousal, negative valence",
+      "priority": 3,
+      "conditions": {
+        "arousal": { "lte": 0.25 },
+        "valence": { "lte": -0.2 }
+      },
+      "instructions": [
+        "Keep responses short and supportive",
+        "Consider suggesting a break if appropriate",
+        "Avoid complex multi-step instructions",
+        "Use an encouraging tone"
+      ]
+    },
+    {
+      "name": "calm_focused",
+      "description": "User is calm and focused — detailed answers are fine",
+      "priority": 10,
+      "conditions": {
+        "stress": { "lte": 0.3 },
+        "focus": { "gte": 0.6 }
+      },
+      "instructions": [
+        "User is focused and calm — detailed answers are welcome",
+        "Feel free to provide thorough explanations",
+        "Include relevant context and nuance"
+      ]
+    },
+    {
+      "name": "high_arousal_positive",
+      "description": "User is excited and positive — match their energy",
+      "priority": 5,
+      "conditions": {
+        "arousal": { "gte": 0.7 },
+        "valence": { "gte": 0.3 }
+      },
+      "instructions": [
+        "User is energized and positive",
+        "Match their enthusiasm in tone",
+        "Be direct and action-oriented"
+      ]
+    },
+    {
+      "name": "anxious",
+      "description": "User is anxious — high arousal, negative valence, high stress",
+      "priority": 1,
+      "conditions": {
+        "arousal": { "gte": 0.6 },
+        "valence": { "lte": -0.3 },
+        "stress": { "gte": 0.5 }
+      },
+      "instructions": [
+        "User appears anxious — be reassuring and structured",
+        "Break information into small, manageable pieces",
+        "Validate their concerns before providing solutions",
+        "Use a warm, supportive tone"
+      ]
+    }
+  ]
+}
