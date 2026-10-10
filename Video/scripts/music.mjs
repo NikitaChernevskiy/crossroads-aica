@@ -1,4 +1,5 @@
-// Synthesizes a seamless 32 s ambient pad loop to public/music.wav.
+// Synthesizes a seamless 32 s loop to public/music.wav: ambient pad + soft plucked arpeggio
+// (120 BPM eighths, octave up so it carries on phone speakers), peak-normalized to -1 dBFS.
 import { writeFileSync } from "node:fs";
 
 const rate = 44100;
@@ -38,6 +39,35 @@ for (let i = 0; i < n; i++) {
   const shimmer = 0.85 + 0.15 * Math.sin(2 * Math.PI * 0.25 * t);
   left[i] = l * 0.06 * shimmer;
   right[i] = r * 0.06 * shimmer;
+}
+
+// Plucked arpeggio: one note per eighth (0.25 s), cycling the current chord one octave up.
+const STEP = 0.25;
+const pattern = [0, 1, 2, 3, 2, 1, 3, 2];
+for (let k = 0; k < seconds / STEP; k++) {
+  const t0 = k * STEP;
+  const chord = chords[Math.floor(t0 / chordLen) % chords.length];
+  const f = chord[pattern[k % pattern.length]] * 2;
+  const accent = k % 4 === 0 ? 1 : 0.7;
+  const pan = 0.5 + 0.35 * Math.sin(k * 0.9);
+  const len = Math.floor(rate * 0.9);
+  for (let j = 0; j < len; j++) {
+    const t = j / rate;
+    const env = Math.min(1, t / 0.004) * Math.exp(-t * 5.5);
+    const v = (Math.sin(2 * Math.PI * f * t) + 0.35 * Math.sin(4 * Math.PI * f * t) + 0.12 * Math.sin(6 * Math.PI * f * t)) * env * accent * 0.05;
+    const idx = (Math.floor(t0 * rate) + j) % n; // wrap so the loop is seamless
+    left[idx] += v * (1 - pan);
+    right[idx] += v * pan;
+  }
+}
+
+// Normalize to -1 dBFS peak.
+let peak = 0;
+for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
+const gain = 0.89 / peak;
+for (let i = 0; i < n; i++) {
+  left[i] *= gain;
+  right[i] *= gain;
 }
 
 const buf = Buffer.alloc(44 + n * 4);

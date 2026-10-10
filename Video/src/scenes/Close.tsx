@@ -37,7 +37,7 @@ const Ask: React.FC = () => {
       <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", ...enter(frame, 3.4 * fps, fps, 10) }}>
         <div style={{ fontSize: 30, color: colors.muted }}>Partners we seek:</div>
         <Chip color={colors.violet} style={{ fontSize: 28 }}>Emerging EEG device makers</Chip>
-        <Chip color={colors.azure} style={{ fontSize: 28 }}>AI agent platforms, e.g. sales agents on Microsoft &amp; Salesforce</Chip>
+        <Chip color={colors.azure} style={{ fontSize: 28 }}>AI agent platforms, e.g. Microsoft Copilot Studio, Salesforce Agentforce</Chip>
       </div>
     </AbsoluteFill>
   );
@@ -60,8 +60,8 @@ const FinalCard: React.FC = () => {
         {config.teamName} · <span style={{ fontFamily: monoFamily }}>{config.repoUrl}</span>
       </div>
       <div style={{ fontSize: 30, color: colors.muted, ...enter(frame, 1.9 * fps, fps) }}>
-        Built with Claude Code · {config.lovableContribution ? "Lovable" : <Todo>Lovable: what it built (e.g. landing page)</Todo>} · on Azure &amp;
-        Microsoft Foundry
+        Built with Azure SRE Agent · Claude Code · {config.lovableContribution ? "Lovable" : <Todo>Lovable: what it built (e.g. landing page)</Todo>} ·
+        on Azure &amp; Microsoft Foundry
       </div>
     </AbsoluteFill>
   );

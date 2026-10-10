@@ -22,7 +22,7 @@ export const Title: React.FC = () => {
   return (
     <Scene id="title" style={{ justifyContent: "center", alignItems: "center", gap: 56, paddingBottom: 120 }}>
       <div style={{ textAlign: "center", ...enter(frame, 0, fps) }}>
-        <Eyebrow>Deep tech · emotional intelligence for AI agents</Eyebrow>
+        <Eyebrow>Crossroads AI Hackathon · AI That Does the Work</Eyebrow>
         <div style={{ fontSize: 120, fontWeight: 800, marginTop: 10 }}>
           AI Emotional <span style={{ color: colors.calm }}>Partner</span>
         </div>

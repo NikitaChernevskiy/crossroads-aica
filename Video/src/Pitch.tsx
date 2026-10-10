@@ -5,13 +5,13 @@ import media from "./data/media.json";
 import config from "./data/config.json";
 import S from "./data/timeline.json";
 import { Architecture } from "./scenes/Architecture";
+import { Built } from "./scenes/Built";
+import { Business } from "./scenes/Business";
 import { Close } from "./scenes/Close";
 import { Demo } from "./scenes/Demo";
 import { EuAiAct } from "./scenes/EuAiAct";
-import { Market } from "./scenes/Market";
 import { Opening } from "./scenes/Opening";
 import { Product } from "./scenes/Product";
-import { Revenue } from "./scenes/Revenue";
 import { Title } from "./scenes/Title";
 import { TeamSlide, teamSlideDefaults } from "./TeamSlide";
 import { Voiceover } from "./components/Voiceover";
@@ -25,7 +25,7 @@ const musicVolume = (f: number, fps: number) =>
   interpolate(
     f / fps,
     [0, 0.5, S.title - 0.5, S.title + 0.5, totalSeconds - 3, totalSeconds],
-    [0, 0.32, 0.32, 0.13, 0.13, 0],
+    [0, 0.5, 0.5, 0.14, 0.14, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
@@ -43,29 +43,29 @@ export const Pitch: React.FC = () => {
         <Series.Sequence name="0:04 Opening" durationInFrames={S.opening * fps} premountFor={fps}>
           <Opening />
         </Series.Sequence>
-        <Series.Sequence name="0:16 Product & buyer" durationInFrames={S.product * fps} premountFor={fps}>
+        <Series.Sequence name="0:16 Product" durationInFrames={S.product * fps} premountFor={fps}>
           <Product />
         </Series.Sequence>
-        <Series.Sequence name="0:28 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
+        <Series.Sequence name="0:27 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
           <Demo />
         </Series.Sequence>
-        <Series.Sequence name="0:50 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
+        <Series.Sequence name="0:49 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
           <Architecture />
         </Series.Sequence>
-        <Series.Sequence name="1:02 EU AI Act" durationInFrames={S.euact * fps} premountFor={fps}>
+        <Series.Sequence name="1:01 How we built it" durationInFrames={S.built * fps} premountFor={fps}>
+          <Built />
+        </Series.Sequence>
+        <Series.Sequence name="1:10 EU AI Act" durationInFrames={S.euact * fps} premountFor={fps}>
           <EuAiAct />
         </Series.Sequence>
-        <Series.Sequence name="1:12 Market" durationInFrames={S.market * fps} premountFor={fps}>
-          <Market />
+        <Series.Sequence name="1:20 Business" durationInFrames={S.business * fps} premountFor={fps}>
+          <Business />
         </Series.Sequence>
-        <Series.Sequence name="1:25 Revenue & GTM" durationInFrames={S.revenue * fps} premountFor={fps}>
-          <Revenue />
-        </Series.Sequence>
-        <Series.Sequence name="1:38 Team" durationInFrames={S.team * fps} premountFor={fps}>
+        <Series.Sequence name="1:33 Team" durationInFrames={S.team * fps} premountFor={fps}>
           <TeamSlide {...teamSlideDefaults} />
           <Voiceover id="team" />
         </Series.Sequence>
-        <Series.Sequence name="1:47 Ask & close" durationInFrames={S.close * fps} premountFor={fps}>
+        <Series.Sequence name="1:42 Ask & close" durationInFrames={S.close * fps} premountFor={fps}>
           <Close />
         </Series.Sequence>
       </Series>

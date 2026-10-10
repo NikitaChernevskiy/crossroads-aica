@@ -2,13 +2,13 @@ import { Composition, Folder } from "remotion";
 import S from "./data/timeline.json";
 import { Pitch, totalSeconds } from "./Pitch";
 import { Architecture } from "./scenes/Architecture";
+import { Built } from "./scenes/Built";
+import { Business } from "./scenes/Business";
 import { Close } from "./scenes/Close";
 import { Demo } from "./scenes/Demo";
 import { EuAiAct } from "./scenes/EuAiAct";
-import { Market } from "./scenes/Market";
 import { Opening } from "./scenes/Opening";
 import { Product } from "./scenes/Product";
-import { Revenue } from "./scenes/Revenue";
 import { Title } from "./scenes/Title";
 import { TeamSlide, TeamSlideVertical } from "./TeamSlide";
 
@@ -22,9 +22,9 @@ export const RemotionRoot: React.FC = () => {
         <Composition id="Product" component={Product} durationInFrames={S.product * 30} fps={30} width={1920} height={1080} />
         <Composition id="Demo" component={Demo} durationInFrames={S.demo * 30} fps={30} width={1920} height={1080} />
         <Composition id="Architecture" component={Architecture} durationInFrames={S.architecture * 30} fps={30} width={1920} height={1080} />
+        <Composition id="Built" component={Built} durationInFrames={S.built * 30} fps={30} width={1920} height={1080} />
         <Composition id="EuAiAct" component={EuAiAct} durationInFrames={S.euact * 30} fps={30} width={1920} height={1080} />
-        <Composition id="Market" component={Market} durationInFrames={S.market * 30} fps={30} width={1920} height={1080} />
-        <Composition id="Revenue" component={Revenue} durationInFrames={S.revenue * 30} fps={30} width={1920} height={1080} />
+        <Composition id="Business" component={Business} durationInFrames={S.business * 30} fps={30} width={1920} height={1080} />
         <Composition id="Close" component={Close} durationInFrames={S.close * 30} fps={30} width={1920} height={1080} />
       </Folder>
       <Folder name="Team">

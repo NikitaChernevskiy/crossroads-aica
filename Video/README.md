@@ -1,23 +1,25 @@
 # AI Emotional Partner: investor pitch and demo video
 
-Remotion project. Output: MP4, 1920x1080, H.264 + AAC, 1:59, burned-in English captions plus `out/captions.srt`.
+Remotion project. Output: MP4, 1920x1080, H.264 + AAC, 1:54, burned-in English captions plus `out/captions.srt`.
 
 ## Edit specification (fixed timeline in `src/data/timeline.json`)
 
+Hackathon theme: **AI That Does the Work**: "Don’t rebuild the agent. Build what it can’t do without you." Judged on working prototype, use of AI, problem & impact, execution & demo quality.
+
 | Time | Scene | Purpose | On screen |
 |---|---|---|---|
-| 0:00–0:04 | Title | The idea in one picture | Silent title card: 😰 person + Muse S Athena → signal → 🤖 → calm reply → 😊. "AI that adapts to how you feel, not just what you ask." Music is louder here |
-| 0:04–0:16 | Opening | Human problem | Split screen, same question in two situations, each with a state emoji. "Same question. Different needs." Labeled *Illustration* |
-| 0:16–0:28 | Product | Product + buyer | Person → Wellbeing app (our customer) → AI Emotional Partner. "We sell to app developers" |
-| 0:28–0:50 | Demo | Core capability | Two real recordings (😊 focused, 😰 tense) + estimated state + **real** `get_behavior_guidance` output |
-| 0:50–1:02 | Architecture | Technical credibility | EEG wearables (official Muse S Athena and Neurable One photos) → Local processing ("Raw Signals Stay Local") → Microsoft Azure (Container Apps: State API + **MCP Guidance Server**, Cosmos DB; Entra, Monitor) → Microsoft Foundry → Personalized response. 😰/😊 example. Then a dashed **Future research** panel: multimodal inputs, "Toward Adaptive AI Without Wearables". Official Azure icons in `public/icons/` |
-| 1:02–1:12 | EU AI Act | Trust | "Emotion recognition is high-risk AI. We build for it." GDPR data minimisation · Art. 50 notice · Art. 5 no workplace/education use · Annex III high-risk controls. Marked as design commitments, not a compliance certification |
-| 1:12–1:25 | Market | Context + segment | One verified stat with source, then "Wellbeing apps already integrating wearables" |
-| 1:25–1:38 | Revenue | Model + GTM | "B2B subscription + usage" (proposed), 4-step pilot → expand path |
-| 1:38–1:47 | Team (`TeamSlide`) | Credibility | Three team cards, see "Team scene" below |
-| 1:47–1:59 | Ask & close | Deep tech ask + hook | Ask: large-scale validation, more devices (EEG, bands, rings), conversation analysis, train with wearables → adapt without. Partners: emerging EEG makers, AI agent platforms (e.g. Microsoft, Salesforce). Hook: "Not everything is measured in money. How people feel matters too. 💙" + credits |
+| 0:00–0:04 | Title | The idea in one picture | Silent card: 😰 person + Muse → signal → 🤖 → calm reply → 😊. Theme line. Music at 50% |
+| 0:04–0:16 | Opening | Human problem | Same question in two situations, 😊 / 😰. "Same question. Different needs." *Illustration* |
+| 0:16–0:27 | Product | Theme fit + buyer | "We don’t rebuild the agent. We give it what it can’t know." 😰 person + large Muse S Athena and Neurable One photos → AI Emotional Partner (one MCP tool) → any AI agent (wellbeing apps first) |
+| 0:27–0:49 | Demo | Working prototype | Two recordings (😊 focused, 😰 tense) + estimated state + **real** `get_behavior_guidance` output. 7 s of spare runtime can extend this when real clips exist |
+| 0:49–1:01 | Architecture | AI use | Wearables → local processing → Azure (Container Apps + MCP Guidance Server, Cosmos DB, Entra, Monitor) → Foundry → response; future-research panel |
+| 1:01–1:10 | How we built it | "Explain how you built it" | Azure SRE Agent (backend, MCP, infra, CI/CD) · Microsoft Foundry · Claude Code (this video) · Lovable (placeholder) |
+| 1:10–1:20 | EU AI Act | Trust | GDPR · Art. 50 · Art. 5 · Annex III design commitments |
+| 1:20–1:33 | Business | Beachhead + model | Wellbeing apps with wearables, $4.5B category context, B2B subscription + usage (proposed), then any agent that works for people |
+| 1:33–1:42 | Team (`TeamSlide`) | Credibility | Three team cards |
+| 1:42–1:54 | Ask & close | Deep tech ask + hook | Validation, devices, conversation analysis, train-with-wearables → without; partners (EEG makers, Copilot Studio, Agentforce); "Not everything is measured in money. How people feel matters too. 💙" |
 
-## Team scene (1:38–1:47, 9 s, composition `TeamSlide`; 9:16 variant `TeamSlideVertical`)
+## Team scene (1:33–1:42, 9 s, composition `TeamSlide`; 9:16 variant `TeamSlideVertical`)
 
 On-screen text (verbatim, source of truth is `src/TeamSlide.tsx`):
 
@@ -69,7 +71,7 @@ Narration: `scripts/script.json` (231 words). Visible text and labels: `src/data
 - **Claude Code**: verified. It built this video in this session. The repo commits are co-authored by Azure SRE Agent, not Claude, so the video does not claim Claude wrote the backend.
 - **Lovable**: no evidence yet in the repo. The architecture doc lists the Lovable landing page as a Sunday task.
 - **Business model, pilots, segment** are hypotheses to validate. Labeled on screen as proposed; no customers, traction or pricing claimed.
-- **Music** is synthesized by `scripts/music.mjs` (no third-party licensing). Volume: 32% under the silent title, 13% under narration, fading out over the last 3 s.
+- **Music** is synthesized by `scripts/music.mjs` (no third-party licensing). Pad + soft plucked arpeggio, normalized to -1 dBFS peak. Volume: 50% under the silent title, 14% under narration (about 9 dB below the voice), fading out over the last 3 s.
 - **Product photos** (`public/muse-s-athena.jpg`, `public/neurable-one.jpg`) are official manufacturer images from choosemuse.com and neurable.com, shown to identify the compatible devices. They are not ours; no endorsement is implied.
 - **Emoji** use Noto Color Emoji (SIL Open Font License) so they look the same on every machine.
 
