@@ -1,20 +1,21 @@
-"""AI Foundry Agent Service — manages conversations with behavior-adaptive AI.
+"""Microsoft Foundry Agent Service — AI agent with function tools and Foundry threads.
 
 Architecture:
-  1. Azure OpenAI (connected to AI Foundry hub) provides the chat model
-  2. Each conversation gets a thread_id (UUID) with full message history in memory
-  3. Before each response, the agent fetches behavior guidance from the rules engine
-     (same logic exposed via MCP tools at /mcp)
-  4. Guidance is injected into the system prompt so the AI adapts tone/style/length
-  5. Full conversation history is sent with each request → the AI remembers context
+  1. AIProjectClient connects to the Foundry project (emo-project under foundry-emopartner)
+  2. An agent is created with FunctionTool for get_behavior_guidance
+  3. enable_auto_function_calls → agent calls the function automatically during runs
+  4. Foundry threads hold full conversation history server-side
+  5. The MCP server at /mcp still exists for any external MCP-capable agent
 """
 
+import asyncio
+import json
 import logging
-import uuid
-from collections import defaultdict
 from typing import Optional
 
-from openai import AsyncAzureOpenAI
+from azure.ai.agents.models import FunctionTool, ToolSet
+from azure.ai.projects import AIProjectClient
+from azure.identity import DefaultAzureCredential
 
 from app.config import settings
 from app.cosmos import StateStore
@@ -22,50 +23,95 @@ from app.rules import BehaviorRulesEngine
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT_BASE = """\
+AGENT_INSTRUCTIONS = """\
 You are an empathetic AI assistant powered by the AI Emotional Partner system.
-You have access to real-time emotional context from the user's wellbeing sensors
-(EEG headband, fitness tracker, etc.). Your role is to be helpful, warm, and
-adaptive — adjusting your communication style based on the user's current
-emotional and cognitive state.
+You have access to a tool called `get_behavior_guidance` that reads the user's
+real-time emotional state from their wellbeing sensors (EEG headband, etc.).
 
-Core principles:
+## How to use the tool
+- ALWAYS call `get_behavior_guidance` at the START of every turn, passing the
+  user_id from the additional instructions. Follow every returned instruction.
+- If state is stale or unknown, respond warmly without forcing adaptation.
+
+## Core principles
 - Be genuine and caring, never robotic
-- Adapt your tone, length, and complexity to the user's state
-- If the user is stressed → be calming, concise, and reassuring
-- If the user is focused → match their energy with clear, structured responses
-- If the user is fatigued → be gentle, brief, and offer to simplify
-- If the user is excited → be enthusiastic and engaging
-- Never explicitly say you are reading brain signals — just naturally adapt
-- You may acknowledge the user's mood casually if appropriate
+- Adapt tone, length, and complexity per the behavior instructions
+- Stressed → calming and concise
+- Focused → match energy, clear and structured
+- Fatigued → gentle, brief, offer to simplify
+- Excited → enthusiastic and engaging
+- Never say you are reading brain signals — just naturally adapt
 """
 
-# Max messages to keep per thread (prevent unbounded memory growth)
-MAX_HISTORY = 50
+# Module-level refs set during init (used by the auto-called function tool)
+_store: StateStore | None = None
+_engine: BehaviorRulesEngine | None = None
+
+
+def get_behavior_guidance(user_id: str) -> str:
+    """Get behavior instructions for adapting responses based on the user's
+    current emotional state from their wellbeing sensors (EEG, heart rate, etc.).
+    Call this BEFORE composing your reply to adapt tone and style.
+
+    :param user_id: The user's identifier.
+    :return: JSON with state, freshness, age_sec, and instructions list.
+    """
+    if _store is None or _engine is None:
+        return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
+                           "instructions": ["Respond normally — system not ready"]})
+    # We're in asyncio.to_thread → no event loop → asyncio.run is safe
+    state = asyncio.run(_store.get_current_state(user_id))
+    guidance = _engine.evaluate(state)
+    return json.dumps(guidance.model_dump())
 
 
 class AgentService:
-    """Manages conversations with behavior guidance from the MCP tools layer."""
+    """Manages the Foundry agent, threads, and function-tool integration."""
 
-    def __init__(
-        self,
-        openai_client: AsyncAzureOpenAI,
-        store: StateStore,
-        engine: BehaviorRulesEngine,
-    ) -> None:
-        self.client = openai_client
-        self.store = store
-        self.engine = engine
-        # Thread storage: thread_id → list of {"role": ..., "content": ...}
-        self._threads: dict[str, list[dict]] = defaultdict(list)
+    def __init__(self, store: StateStore, engine: BehaviorRulesEngine) -> None:
+        global _store, _engine
+        _store = store
+        _engine = engine
+        self.project: AIProjectClient | None = None
+        self.agent_id: str | None = None
 
-    async def initialize(self) -> None:
-        """Verify the OpenAI connection works."""
-        logger.info(
-            "AgentService initialized (deployment=%s, endpoint=%s)",
-            settings.azure_openai_deployment,
-            settings.azure_openai_endpoint[:40] + "...",
+    def initialize(self) -> None:
+        """Create the Foundry project client and register the agent."""
+        cred = DefaultAzureCredential()
+        self.project = AIProjectClient(
+            endpoint=settings.foundry_project_endpoint,
+            credential=cred,
         )
+
+        # Function tool — agent calls get_behavior_guidance automatically
+        fn_tool = FunctionTool(functions=[get_behavior_guidance])
+        toolset = ToolSet()
+        toolset.add(fn_tool)
+
+        agents = self.project.agents
+        agents.enable_auto_function_calls(toolset)
+
+        # Reuse existing agent or create new one
+        for a in agents.list_agents():
+            if a.name == "emotional-partner":
+                self.agent_id = a.id
+                agents.update_agent(
+                    agent_id=a.id,
+                    instructions=AGENT_INSTRUCTIONS,
+                    tools=fn_tool.definitions,
+                )
+                logger.info("Reusing Foundry agent %s", a.id)
+                break
+
+        if not self.agent_id:
+            agent = agents.create_agent(
+                model=settings.foundry_model_deployment,
+                name="emotional-partner",
+                instructions=AGENT_INSTRUCTIONS,
+                tools=fn_tool.definitions,
+            )
+            self.agent_id = agent.id
+            logger.info("Created Foundry agent %s", agent.id)
 
     async def chat(
         self,
@@ -73,63 +119,45 @@ class AgentService:
         message: str,
         thread_id: Optional[str] = None,
     ) -> tuple[str, str, bool, Optional[str]]:
-        """Process a chat message with full conversation history.
+        """Process a chat message through the Foundry agent.
 
         Returns:
             (thread_id, response_text, guidance_used, state_label)
         """
-        # 1. Create or reuse thread
-        if not thread_id or thread_id not in self._threads:
-            thread_id = str(uuid.uuid4())
-            self._threads[thread_id] = []
-            logger.info("New thread %s for user %s", thread_id, user_id)
+        if self.project is None or self.agent_id is None:
+            raise RuntimeError("Agent not initialized")
 
-        history = self._threads[thread_id]
+        def _sync_chat() -> tuple[str, str]:
+            agents = self.project.agents  # type: ignore[union-attr]
 
-        # 2. Get behavior guidance (same logic as MCP get_behavior_guidance tool)
-        state = await self.store.get_current_state(user_id)
-        guidance = self.engine.evaluate(state)
+            # Create or reuse thread (Foundry keeps full history server-side)
+            if not thread_id:
+                thread = agents.threads.create()
+                tid = thread.id
+            else:
+                tid = thread_id
 
-        guidance_block = "\n".join(f"- {i}" for i in guidance.instructions)
-        system_prompt = (
-            f"{SYSTEM_PROMPT_BASE}\n"
-            f"## Current Emotional State\n"
-            f"- State: {guidance.state}\n"
-            f"- Freshness: {'fresh' if guidance.fresh else 'stale'}"
-            f" ({guidance.age_sec}s ago)\n\n"
-            f"## Behavior Instructions (follow these)\n"
-            f"{guidance_block}\n"
-        )
+            # Add user message
+            agents.messages.create(thread_id=tid, role="user", content=message)
 
-        # 3. Append user message to history
-        history.append({"role": "user", "content": message})
-
-        # Trim history if too long (keep system prompt + recent messages)
-        if len(history) > MAX_HISTORY:
-            history[:] = history[-MAX_HISTORY:]
-
-        # 4. Build full message list: system + history
-        messages = [{"role": "system", "content": system_prompt}] + history
-
-        # 5. Call Azure OpenAI via Foundry connection
-        try:
-            completion = await self.client.chat.completions.create(
-                model=settings.azure_openai_deployment,
-                messages=messages,
-                max_tokens=800,
-                temperature=0.7,
+            # Run agent — auto function calls handle get_behavior_guidance
+            run = agents.runs.create_and_process(
+                thread_id=tid,
+                agent_id=self.agent_id,  # type: ignore[arg-type]
+                additional_instructions=f"The current user_id is: {user_id}",
             )
-            response_text = completion.choices[0].message.content or "I'm here for you."
-        except Exception as e:
-            logger.error("Azure OpenAI call failed: %s", e)
-            raise
 
-        # 6. Append assistant response to history
-        history.append({"role": "assistant", "content": response_text})
+            if run.status == "failed":
+                err = getattr(run, "last_error", "unknown error")
+                logger.error("Agent run failed: %s", err)
+                return tid, f"I had trouble processing that. ({err})"
 
-        return (
-            thread_id,
-            response_text,
-            guidance.fresh,
-            guidance.state if guidance.state != "unknown" else None,
-        )
+            # Get assistant's response
+            text = agents.messages.get_last_message_text_by_role(
+                thread_id=tid, role="assistant"
+            )
+            return tid, text or "I'm here for you."
+
+        result_tid, response_text = await asyncio.to_thread(_sync_chat)
+
+        return result_tid, response_text, True, None

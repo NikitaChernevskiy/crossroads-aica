@@ -11,7 +11,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from openai import AsyncAzureOpenAI
 
 from app.agent import AgentService
 from app.config import settings
@@ -42,18 +41,13 @@ async def lifespan(app: FastAPI):
     await store.initialize()
     # Wire MCP tools to the shared store and engine
     init_mcp(store, engine)
-    # Initialize AI Foundry Agent Service
-    if settings.azure_openai_endpoint and settings.azure_openai_key:
-        oai_client = AsyncAzureOpenAI(
-            azure_endpoint=settings.azure_openai_endpoint,
-            api_key=settings.azure_openai_key,
-            api_version=settings.azure_openai_api_version,
-        )
-        agent_service = AgentService(oai_client, store, engine)
-        await agent_service.initialize()
-        logger.info("AI Foundry Agent Service initialized")
+    # Initialize Microsoft Foundry Agent Service
+    if settings.foundry_project_endpoint:
+        agent_service = AgentService(store, engine)
+        agent_service.initialize()
+        logger.info("Microsoft Foundry Agent Service initialized (agent=%s)", agent_service.agent_id)
     else:
-        logger.warning("Azure OpenAI not configured — /chat endpoint will be unavailable")
+        logger.warning("Foundry not configured — set FOUNDRY_PROJECT_ENDPOINT and MCP_SERVER_URL")
     yield
 
 
@@ -133,7 +127,7 @@ async def chat(req: ChatRequest):
     if agent_service is None:
         raise HTTPException(
             status_code=503,
-            detail="AI Agent Service not configured. Set AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_KEY.",
+            detail="Foundry Agent Service not configured. Set FOUNDRY_PROJECT_ENDPOINT and MCP_SERVER_URL.",
         )
 
     try:

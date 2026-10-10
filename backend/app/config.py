@@ -15,11 +15,10 @@ class Settings(BaseSettings):
     # Use in-memory storage when Cosmos DB is not configured (local dev)
     use_in_memory: bool = True
 
-    # Azure OpenAI
-    azure_openai_endpoint: str = ""
-    azure_openai_key: str = ""
-    azure_openai_deployment: str = "gpt-4-1-nano"
-    azure_openai_api_version: str = "2025-03-01-preview"  # Assistants API v2 support
+    # Microsoft Foundry Agent Service
+    foundry_project_endpoint: str = ""  # https://<resource>.services.ai.azure.com/api/projects/<project>
+    foundry_model_deployment: str = "gpt-5-nano"
+    mcp_server_url: str = ""  # Public URL of this backend's /mcp endpoint
 
     # Key Vault (optional — used in production)
     keyvault_url: str = ""
