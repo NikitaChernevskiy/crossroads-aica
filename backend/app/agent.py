@@ -1,9 +1,9 @@
 """Microsoft Foundry Agent Service — AI agent with function tools and Foundry threads.
 
 Architecture:
-  1. AIProjectClient connects to the Foundry project (emo-project under foundry-emopartner)
+  1. AgentsClient connects directly to the Foundry project endpoint
   2. An agent is created with FunctionTool for get_behavior_guidance
-  3. enable_auto_function_calls → agent calls the function automatically during runs
+  3. enable_auto_function_calls → SDK auto-invokes the function during runs
   4. Foundry threads hold full conversation history server-side
   5. The MCP server at /mcp still exists for any external MCP-capable agent
 """
@@ -13,8 +13,8 @@ import json
 import logging
 from typing import Optional
 
+from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import FunctionTool, ToolSet
-from azure.ai.projects import AIProjectClient
 from azure.identity import DefaultAzureCredential
 
 from app.config import settings
@@ -72,30 +72,28 @@ class AgentService:
         global _store, _engine
         _store = store
         _engine = engine
-        self.project: AIProjectClient | None = None
+        self.client: AgentsClient | None = None
         self.agent_id: str | None = None
 
     def initialize(self) -> None:
-        """Create the Foundry project client and register the agent."""
+        """Create the AgentsClient and register the agent."""
         cred = DefaultAzureCredential()
-        self.project = AIProjectClient(
+        self.client = AgentsClient(
             endpoint=settings.foundry_project_endpoint,
             credential=cred,
         )
 
-        # Function tool — agent calls get_behavior_guidance automatically
+        # Function tool — SDK auto-invokes get_behavior_guidance during runs
         fn_tool = FunctionTool(functions=[get_behavior_guidance])
         toolset = ToolSet()
         toolset.add(fn_tool)
-
-        agents = self.project.agents
-        agents.enable_auto_function_calls(toolset)
+        self.client.enable_auto_function_calls(toolset)
 
         # Reuse existing agent or create new one
-        for a in agents.list_agents():
+        for a in self.client.list_agents():
             if a.name == "emotional-partner":
                 self.agent_id = a.id
-                agents.update_agent(
+                self.client.update_agent(
                     agent_id=a.id,
                     instructions=AGENT_INSTRUCTIONS,
                     tools=fn_tool.definitions,
@@ -104,7 +102,7 @@ class AgentService:
                 break
 
         if not self.agent_id:
-            agent = agents.create_agent(
+            agent = self.client.create_agent(
                 model=settings.foundry_model_deployment,
                 name="emotional-partner",
                 instructions=AGENT_INSTRUCTIONS,
@@ -124,24 +122,22 @@ class AgentService:
         Returns:
             (thread_id, response_text, guidance_used, state_label)
         """
-        if self.project is None or self.agent_id is None:
+        if self.client is None or self.agent_id is None:
             raise RuntimeError("Agent not initialized")
 
         def _sync_chat() -> tuple[str, str]:
-            agents = self.project.agents  # type: ignore[union-attr]
-
             # Create or reuse thread (Foundry keeps full history server-side)
             if not thread_id:
-                thread = agents.threads.create()
+                thread = self.client.threads.create()  # type: ignore[union-attr]
                 tid = thread.id
             else:
                 tid = thread_id
 
             # Add user message
-            agents.messages.create(thread_id=tid, role="user", content=message)
+            self.client.messages.create(thread_id=tid, role="user", content=message)  # type: ignore[union-attr]
 
             # Run agent — auto function calls handle get_behavior_guidance
-            run = agents.runs.create_and_process(
+            run = self.client.runs.create_and_process(  # type: ignore[union-attr]
                 thread_id=tid,
                 agent_id=self.agent_id,  # type: ignore[arg-type]
                 additional_instructions=f"The current user_id is: {user_id}",
@@ -153,7 +149,7 @@ class AgentService:
                 return tid, f"I had trouble processing that. ({err})"
 
             # Get assistant's response
-            text = agents.messages.get_last_message_text_by_role(
+            text = self.client.messages.get_last_message_text_by_role(  # type: ignore[union-attr]
                 thread_id=tid, role="assistant"
             )
             return tid, text or "I'm here for you."
