@@ -17,7 +17,7 @@ type Icon = "award" | "cap" | "shield" | "trophy" | "briefcase" | "spark" | "cha
 type Member = {
   name: string;
   title: string;
-  role: string; // ROLE: confirm with Artem
+  role: string;
   credentials: [Icon, string][];
   status: string;
   photo: string;
@@ -28,7 +28,7 @@ const members: Member[] = [
   {
     name: "Artem Chernevskiy",
     title: "Founder, AICA",
-    role: "Product, emotion model, Foundry agent", // ROLE: confirm with Artem
+    role: "Product, emotion model, Foundry agent", // ROLE: confirmed
     credentials: [
       ["award", "Microsoft MVP · Microsoft Foundry & M365 Copilot"],
       ["cap", "Erickson-trained coach · 128h ICF-approved education"],
@@ -52,7 +52,7 @@ const members: Member[] = [
   {
     name: "Peter Belousov",
     title: "Partner, Business Development & Sales, AICA",
-    role: "Go-to-market and product discovery", // ROLE: confirm with Artem
+    role: "Go-to-market and product discovery", // ROLE: confirmed
     credentials: [
       ["briefcase", "Senior PM · WebPros (cPanel, Plesk), Smartcat, SberTech"],
       ["spark", "Launched an in-product AI agent for a global payroll platform"],

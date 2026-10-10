@@ -22,7 +22,7 @@ On-screen text (verbatim, source of truth is `src/TeamSlide.tsx`):
 
 - Title **THE TEAM**, subtitle *Builders who speak human*
 - **Artem Chernevskiy**, Founder, AICA
-  - Role: Product, emotion model, Foundry agent <!-- ROLE: confirm with Artem -->
+  - Role: Product, emotion model, Foundry agent (confirmed)
   - Microsoft MVP · Microsoft Foundry & M365 Copilot
   - Erickson-trained coach · 128h ICF-approved education
   - Harvard Online · Data Privacy and Technology
@@ -34,7 +34,7 @@ On-screen text (verbatim, source of truth is `src/TeamSlide.tsx`):
   - Elevate AUBG Accelerator winner · DigiEduHack 2025 podium
   - Tag: Current state: deeply focused
 - **Peter Belousov**, Partner, Business Development & Sales, AICA
-  - Role: Go-to-market and product discovery <!-- ROLE: confirm with Artem -->
+  - Role: Go-to-market and product discovery (confirmed)
   - Senior PM · WebPros (cPanel, Plesk), Smartcat, SberTech
   - Launched an in-product AI agent for a global payroll platform
   - 4× purchase conversion growth at WebPros
