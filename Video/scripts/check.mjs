@@ -12,7 +12,7 @@ const total = Object.values(timeline).reduce((a, b) => a + b, 0);
 if (total > 120) issues.push(`Duration ${total} s exceeds 2:00`);
 for (const id of Object.keys(timeline)) if (script[id] && !media.voiceover[id]) issues.push(`No narration for "${id}" (npm run voiceover)`);
 if (!media.demoFocused) issues.push("Missing public/demo-focused.mp4");
-if (!media.demoTense) issues.push("Missing public/demo-tense.mp4");
+if (!media.demoTense) issues.push("Missing public/demo-stressed.mp4");
 if (!config.claudeContribution) issues.push("config.claudeContribution is empty");
 if (!config.lovableContribution) issues.push("config.lovableContribution is empty");
 

@@ -1,172 +1,185 @@
 import { Video } from "@remotion/media";
-import { AbsoluteFill, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { interpolate, Sequence, Series, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { Face } from "../components/Face";
 import { Chip, Panel } from "../components/Panel";
 import { Scene } from "../components/Scene";
+import type { SceneId } from "../components/Voiceover";
 import config from "../data/config.json";
 import guidance from "../data/guidance.json";
-import media from "../data/media.json";
-import { Face } from "../components/Face";
-import { colors, enter, faces, monoFamily } from "../theme";
+import { colors, enter, faces, monoFamily, progress } from "../theme";
 
-const MAX_LINES = 4;
-
-const Half: React.FC<{
+// Playwright recordings of the live reference build (sensor client in simulation mode →
+// Azure backend → Foundry agent), 1280×800. Timings in assets-src/demo-timings.json.
+// Each take plays three cuts: profile + live chart, typing + send, then the reply.
+// The agent's wait between send and reply is cut out and labelled on screen.
+type Take = {
+  readonly id: SceneId;
+  readonly file: string;
   readonly label: string;
   readonly emoji: string;
   readonly accent: string;
   readonly indicators: string;
   readonly instructions: string[];
-  readonly file: string;
-  readonly available: boolean;
-  readonly trimStart: number;
-  readonly placeholder: { title: string; steps: string[] };
-}> = ({ label, emoji, accent, indicators, instructions, file, available, trimStart, placeholder }) => {
-  const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
-  const shown = instructions.slice(0, MAX_LINES);
-  const hidden = instructions.length - shown.length;
-
-  return (
-    <AbsoluteFill style={{ flexDirection: "row", gap: 40, padding: "200px 130px 190px" }}>
-      <div
-        style={{
-          flex: 1.55,
-          borderRadius: 20,
-          overflow: "hidden",
-          border: `2px solid ${accent}`,
-          background: "#0E1430",
-          position: "relative",
-          ...enter(frame, 0, fps, 20),
-        }}
-      >
-        {available ? (
-          <Video
-            name={`Recording: ${label}`}
-            src={staticFile(file)}
-            trimBefore={Math.round(trimStart * fps)}
-            durationInFrames={durationInFrames}
-            premountFor={fps}
-            objectFit="contain"
-            muted
-            style={{ width: "100%", height: "100%" }}
-          />
-        ) : (
-          <AbsoluteFill
-            style={{
-              justifyContent: "center",
-              alignItems: "flex-start",
-              gap: 18,
-              padding: "40px 56px",
-              border: `4px dashed ${colors.stress}`,
-              borderRadius: 20,
-            }}
-          >
-            <div style={{ fontSize: 26, fontWeight: 800, color: colors.stress, letterSpacing: 3 }}>PLACEHOLDER · SCREEN RECORDING</div>
-            <div style={{ fontSize: 40, fontWeight: 800 }}>{placeholder.title}</div>
-            {placeholder.steps.map((s, i) => (
-              <div key={s} style={{ fontSize: 28, color: colors.text, lineHeight: 1.35 }}>
-                <span style={{ color: colors.stress, fontWeight: 800 }}>{i + 1}.</span> {s}
-              </div>
-            ))}
-            <div style={{ fontSize: 24, color: colors.muted, fontFamily: monoFamily }}>→ save as public/{file}</div>
-          </AbsoluteFill>
-        )}
-      </div>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 24 }}>
-        <Panel accent={accent} style={{ padding: 28, ...enter(frame, 0.4 * fps, fps, 20) }}>
-          <div style={{ fontSize: 26, color: colors.muted }}>Estimated state · {config.demoInputLabel.toLowerCase()}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 22, marginTop: 6 }}>
-            <Face emoji={emoji} size={120} color={accent} start={0.5} />
-            <div>
-              <div style={{ fontSize: 44, fontWeight: 800, color: accent }}>{label}</div>
-              <div style={{ fontSize: 26, fontFamily: monoFamily, color: colors.muted }}>{indicators}</div>
-            </div>
-          </div>
-        </Panel>
-        <Panel style={{ padding: 28, flex: 1, ...enter(frame, 1.6 * fps, fps, 20) }}>
-          <div style={{ fontSize: 26, color: colors.muted, fontFamily: monoFamily, marginBottom: 14 }}>
-            get_behavior_guidance → instructions
-          </div>
-          {shown.map((line, i) => (
-            <div key={line} style={{ fontSize: 30, lineHeight: 1.35, marginBottom: 10, ...enter(frame, (2 + i * 0.35) * fps, fps, 10) }}>
-              • {line}
-            </div>
-          ))}
-          {hidden > 0 ? (
-            <div style={{ fontSize: 24, color: colors.muted, fontStyle: "italic" }}>Excerpt · +{hidden} more instructions</div>
-          ) : null}
-        </Panel>
-      </div>
-    </AbsoluteFill>
-  );
+  readonly startAt: number; // seconds into the scene
+  readonly segments: [number, number][]; // [from, to] seconds in the recording
+  readonly waitSec: number;
+  readonly zoom: { scale: number; origin: string };
 };
 
-export const Demo: React.FC = () => {
+const takes: Record<"focused" | "stressed", Take> = {
+  focused: {
+    id: "demo",
+    file: "demo-focused.mp4",
+    label: "Calm & focused",
+    emoji: faces.focused,
+    accent: colors.azure,
+    indicators: "stress 0.15\nfocus 0.80",
+    instructions: guidance.focused.instructions,
+    startAt: 1,
+    segments: [
+      [1.8, 5.0],
+      [6.0, 8.9],
+      [26.0, 32.9],
+    ],
+    waitSec: 18,
+    zoom: { scale: 1.3, origin: "92% 45%" },
+  },
+  stressed: {
+    id: "demostress",
+    file: "demo-stressed.mp4",
+    label: "Stressed",
+    emoji: faces.tense,
+    accent: colors.stress,
+    indicators: "stress 0.72\nfocus 0.40",
+    instructions: guidance.stressed.instructions,
+    startAt: 0.4,
+    segments: [
+      [2.4, 4.9],
+      [6.5, 9.0],
+      [23.7, 31.2],
+    ],
+    waitSec: 16,
+    zoom: { scale: 1.6, origin: "48% 30%" },
+  },
+};
+
+const REC = { w: 1152, h: 720, top: 160, left: 130 };
+
+const Recording: React.FC<{ readonly take: Take }> = ({ take }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const lens = take.segments.map(([a, b]) => b - a);
+  const replyStart = (lens[0] + lens[1]) * fps;
+  const zoom = interpolate(frame, [replyStart + 0.8 * fps, replyStart + 2 * fps], [1, take.zoom.scale], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const cutChip = interpolate(frame, [replyStart, replyStart + 0.2 * fps, replyStart + 2.2 * fps, replyStart + 2.6 * fps], [0, 1, 1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
 
   return (
-    <Scene id="demo" style={{ padding: 0 }}>
+    <div
+      style={{
+        position: "absolute",
+        left: REC.left,
+        top: REC.top,
+        width: REC.w,
+        height: REC.h,
+        borderRadius: 20,
+        overflow: "hidden",
+        border: `2px solid ${take.accent}`,
+        boxShadow: `0 0 60px ${take.accent}33`,
+        background: "#0B0F1E",
+        ...enter(frame, 0, fps, 20),
+      }}
+    >
+      <div style={{ width: "100%", height: "100%", scale: String(zoom), transformOrigin: take.zoom.origin }}>
+        <Series>
+          {take.segments.map(([a, b], i) => (
+            <Series.Sequence key={a} durationInFrames={Math.round((b - a) * fps)} name={`Cut ${i + 1}`}>
+              <Video src={staticFile(take.file)} trimBefore={Math.round(a * fps)} muted objectFit="cover" style={{ width: "100%", height: "100%" }} />
+            </Series.Sequence>
+          ))}
+        </Series>
+      </div>
       <div
         style={{
           position: "absolute",
-          top: 80,
-          left: 130,
-          right: 130,
-          display: "flex",
-          alignItems: "center",
-          gap: 24,
-          ...enter(frame, 0, fps),
+          top: 18,
+          right: 18,
+          padding: "8px 16px",
+          borderRadius: 999,
+          background: "rgba(7,11,26,0.85)",
+          border: `1px solid ${colors.border}`,
+          fontSize: 22,
+          fontWeight: 600,
+          opacity: cutChip,
         }}
       >
-        <Chip color={colors.calm}>Reference build</Chip>
-        <Chip color={colors.violet}>{config.demoInputLabel}</Chip>
-        <div style={{ fontSize: 40, fontWeight: 600 }}>
-          Same question: <span style={{ color: colors.calm }}>"{config.demoQuestion}"</span>
-        </div>
+        ⏩ {take.waitSec} s agent wait cut
       </div>
-      <Sequence name="Focused state" from={1 * fps} durationInFrames={11.5 * fps} premountFor={fps}>
-        <Half
-          label="Focused"
-          emoji={faces.focused}
-          accent={colors.azure}
-          indicators="stress 0.15 · focus 0.80"
-          instructions={guidance.focused.instructions}
-          file="demo-focused.mp4"
-          available={media.demoFocused}
-          trimStart={config.demoFocusedTrimStart}
-          placeholder={{
-            title: "Sensor client + chat, focused state",
-            steps: [
-              "Simulator set to Focused (stress 0.15, focus 0.80)",
-              `User asks: "${config.demoQuestion}"`,
-              "Agent replies in detail: several options, structured",
-              "~11 s, chat zoomed so the reply is readable",
-            ],
-          }}
-        />
-      </Sequence>
-      <Sequence name="Tense state" from={12.5 * fps} durationInFrames={9.5 * fps} premountFor={fps}>
-        <Half
-          label="Tense"
-          emoji={faces.tense}
-          accent={colors.calm}
-          indicators="stress 0.68 · focus 0.41"
-          instructions={guidance.tense.instructions}
-          file="demo-tense.mp4"
-          available={media.demoTense}
-          trimStart={config.demoTenseTrimStart}
-          placeholder={{
-            title: "Same chat, tense state",
-            steps: [
-              "Simulator set to Tense (stress 0.68, focus 0.41)",
-              `Same question: "${config.demoQuestion}"`,
-              "Agent replies short and calm: one next step",
-              "~9 s, same agent and settings as the focused clip",
-            ],
-          }}
-        />
+    </div>
+  );
+};
+
+const SidePanels: React.FC<{ readonly take: Take }> = ({ take }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const lens = take.segments.map(([a, b]) => b - a);
+  const toolAt = lens[0] + lens[1] - 0.3; // the agent calls the tool right after "send"
+  return (
+    <div style={{ position: "absolute", top: REC.top, left: REC.left + REC.w + 36, right: 130, display: "flex", flexDirection: "column", gap: 22 }}>
+      <Panel accent={take.accent} style={{ padding: 24, ...enter(frame, 0.3 * fps, fps, 20) }}>
+        <div style={{ fontSize: 22, color: colors.muted }}>Estimated state · {config.demoInputLabel.toLowerCase()}</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, marginTop: 8 }}>
+          <Face emoji={take.emoji} size={110} color={take.accent} start={0.5} />
+          <div>
+            <div style={{ fontSize: 38, fontWeight: 800, color: take.accent, lineHeight: 1.1 }}>{take.label}</div>
+            <div style={{ fontSize: 22, fontFamily: monoFamily, color: colors.muted, marginTop: 6, whiteSpace: "pre-line" }}>{take.indicators}</div>
+          </div>
+        </div>
+      </Panel>
+      <Panel style={{ padding: 24, opacity: progress(frame, toolAt * fps, (toolAt + 0.4) * fps) }}>
+        <div style={{ fontSize: 21, color: colors.calm, fontFamily: monoFamily, marginBottom: 12 }}>get_behavior_guidance →</div>
+        {take.instructions.map((line, i) => (
+          <div key={line} style={{ fontSize: 24, lineHeight: 1.35, marginBottom: 10, ...enter(frame, (toolAt + 0.2 + i * 0.3) * fps, fps, 10) }}>
+            {line}
+          </div>
+        ))}
+        <div style={{ fontSize: 18, color: colors.muted, fontStyle: "italic" }}>From behavior_rules.json</div>
+      </Panel>
+    </div>
+  );
+};
+
+const Header: React.FC<{ readonly animate: boolean }> = ({ animate }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  return (
+    <div style={{ position: "absolute", top: 72, left: 130, right: 130, display: "flex", alignItems: "center", gap: 20, ...(animate ? enter(frame, 0, fps) : {}) }}>
+      <Chip color={colors.calm} style={{ fontSize: 26 }}>Live build on Azure</Chip>
+      <Chip color={colors.violet} style={{ fontSize: 26 }}>{config.demoInputLabel}</Chip>
+      <div style={{ fontSize: 36, fontWeight: 600 }}>
+        Same question: <span style={{ color: colors.calm }}>"{config.demoQuestion}"</span>
+      </div>
+    </div>
+  );
+};
+
+const DemoTake: React.FC<{ readonly take: Take; readonly animateHeader: boolean }> = ({ take, animateHeader }) => {
+  const { fps } = useVideoConfig();
+  return (
+    <Scene id={take.id} style={{ padding: 0 }}>
+      <Header animate={animateHeader} />
+      <Sequence from={Math.round(take.startAt * fps)} premountFor={fps} name={`Take: ${take.label}`}>
+        <Recording take={take} />
+        <SidePanels take={take} />
       </Sequence>
     </Scene>
   );
 };
+
+export const Demo: React.FC = () => <DemoTake take={takes.focused} animateHeader />;
+export const DemoStressed: React.FC = () => <DemoTake take={takes.stressed} animateHeader={false} />;

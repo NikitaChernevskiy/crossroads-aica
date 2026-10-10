@@ -60,8 +60,8 @@ export const Built: React.FC = () => {
           start={0.6}
         />
         <Tool icon="foundry" name="Microsoft Foundry" what="Agent Service + MCP tool call" start={1.1} />
-        <Tool emoji="✳️" name="Claude Code" what="This pitch video + narration pipeline" start={1.6} />
-        <Tool emoji="💜" name="Lovable" what={config.lovableContribution || <Todo>what Lovable built</Todo>} start={2.1} />
+        <Tool icon="claude" name="Claude Code" what="This pitch video + narration pipeline" start={1.6} />
+        <Tool icon="lovable" name="Lovable" what={config.lovableContribution || <Todo>what Lovable built</Todo>} start={2.1} />
       </div>
     </Scene>
   );

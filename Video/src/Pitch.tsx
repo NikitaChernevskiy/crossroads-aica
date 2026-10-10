@@ -8,7 +8,7 @@ import { Architecture } from "./scenes/Architecture";
 import { Built } from "./scenes/Built";
 import { Business } from "./scenes/Business";
 import { Close } from "./scenes/Close";
-import { Demo } from "./scenes/Demo";
+import { Demo, DemoStressed } from "./scenes/Demo";
 import { EuAiAct } from "./scenes/EuAiAct";
 import { Opening } from "./scenes/Opening";
 import { Product } from "./scenes/Product";
@@ -49,23 +49,26 @@ export const Pitch: React.FC = () => {
         <Series.Sequence name="0:27 Demo" durationInFrames={S.demo * fps} premountFor={fps}>
           <Demo />
         </Series.Sequence>
-        <Series.Sequence name="0:49 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
+        <Series.Sequence name="0:41 Demo stressed" durationInFrames={S.demostress * fps} premountFor={fps}>
+          <DemoStressed />
+        </Series.Sequence>
+        <Series.Sequence name="0:54 Architecture" durationInFrames={S.architecture * fps} premountFor={fps}>
           <Architecture />
         </Series.Sequence>
-        <Series.Sequence name="1:01 How we built it" durationInFrames={S.built * fps} premountFor={fps}>
+        <Series.Sequence name="1:06 How we built it" durationInFrames={S.built * fps} premountFor={fps}>
           <Built />
         </Series.Sequence>
-        <Series.Sequence name="1:10 EU AI Act" durationInFrames={S.euact * fps} premountFor={fps}>
+        <Series.Sequence name="1:15 EU AI Act" durationInFrames={S.euact * fps} premountFor={fps}>
           <EuAiAct />
         </Series.Sequence>
-        <Series.Sequence name="1:20 Business" durationInFrames={S.business * fps} premountFor={fps}>
+        <Series.Sequence name="1:25 Business" durationInFrames={S.business * fps} premountFor={fps}>
           <Business />
         </Series.Sequence>
-        <Series.Sequence name="1:33 Team" durationInFrames={S.team * fps} premountFor={fps}>
+        <Series.Sequence name="1:38 Team" durationInFrames={S.team * fps} premountFor={fps}>
           <TeamSlide {...teamSlideDefaults} />
           <Voiceover id="team" />
         </Series.Sequence>
-        <Series.Sequence name="1:42 Ask & close" durationInFrames={S.close * fps} premountFor={fps}>
+        <Series.Sequence name="1:47 Ask & close" durationInFrames={S.close * fps} premountFor={fps}>
           <Close />
         </Series.Sequence>
       </Series>

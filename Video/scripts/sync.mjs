@@ -94,8 +94,8 @@ for (const [id, sceneSec] of Object.entries(timeline)) {
 for (let i = 0; i < captions.length - 1; i++) captions[i].endMs = Math.min(captions[i].endMs, captions[i + 1].startMs);
 
 media.demoFocused = existsSync("public/demo-focused.mp4");
-media.demoTense = existsSync("public/demo-tense.mp4");
-for (const f of ["demo-focused", "demo-tense"]) {
+media.demoTense = existsSync("public/demo-stressed.mp4");
+for (const f of ["demo-focused", "demo-stressed"]) {
   if (existsSync(`public/${f}.mp4`)) console.log(`  ${f}.mp4 ${(await duration(`public/${f}.mp4`)).toFixed(1)} s`);
 }
 

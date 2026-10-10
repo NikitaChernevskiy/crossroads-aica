@@ -45,7 +45,14 @@ export const Product: React.FC = () => {
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {/* The person and the wearables they already own */}
         <Panel accent={colors.violet} style={{ display: "flex", alignItems: "center", gap: 22, padding: "24px 28px", ...enter(frame, 1.2 * fps, fps) }}>
-          <Face emoji={faces.tense} size={150} color={colors.stress} start={1.4} />
+          {/* Real hardware: teammate Nikita wearing the Muse S Athena */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, ...enter(frame, 1.4 * fps, fps, 20) }}>
+            <div style={{ position: "relative", width: 190, height: 190 }}>
+              <Img src={staticFile("nikita-muse.jpg")} style={{ width: 190, height: 190, objectFit: "cover", objectPosition: "50% 22%", borderRadius: 20 }} />
+              <Face emoji={faces.tense} size={76} color={colors.stress} start={1.8} style={{ position: "absolute", right: -18, bottom: -14 }} />
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 800 }}>Nikita, team test</div>
+          </div>
           <Device src="muse-s-athena.jpg" name="Muse S Athena" start={1.8} />
           <Device src="neurable-one.jpg" name="Neurable One" start={2.2} />
         </Panel>
