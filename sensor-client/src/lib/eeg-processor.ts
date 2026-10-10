@@ -14,7 +14,7 @@
  *   Valence: frontal alpha asymmetry (AF8 alpha - AF7 alpha)
  *   Arousal: beta / alpha ratio (average across channels)
  *   Focus:  beta / (alpha + theta) ratio
- *   Stress: high-beta (20-30Hz) power / total power
+ *   Stress: theta/beta ratio inverted (low theta relative to beta = stressed)
  */
 
 // Muse 2 / Muse S electrode positions
@@ -105,13 +105,20 @@ function classifyLabel(metrics: {
   focus: number;
   stress: number;
 }): string {
-  if (metrics.stress > 0.65) return "anxious";
-  if (metrics.stress > 0.5 && metrics.arousal > 0.6) return "tense";
+  // Meditative: very low stress, moderate-low arousal, positive or neutral valence
+  if (metrics.stress < 0.2 && metrics.arousal < 0.35 && metrics.valence >= -0.1) return "meditative";
+  // Stressed: high stress regardless of arousal (covers old tense + anxious)
+  if (metrics.stress > 0.6) return "stressed";
+  // Focused: high engagement, not stressed
   if (metrics.focus > 0.65 && metrics.valence > 0) return "focused";
+  // Fatigued: low arousal AND low focus
   if (metrics.arousal < 0.3 && metrics.focus < 0.35) return "fatigued";
+  // Excited: high arousal + positive valence
   if (metrics.valence > 0.3 && metrics.arousal > 0.5) return "excited";
+  // Calm: positive valence, low arousal
   if (metrics.valence > 0.1 && metrics.arousal < 0.5) return "calm";
-  if (metrics.valence < -0.2) return "tense";
+  // Distracted: low focus, not fitting other categories
+  if (metrics.focus < 0.3) return "distracted";
   return "neutral";
 }
 
@@ -187,10 +194,13 @@ export class EEGProcessor {
     const engagementRatio = avgBeta / Math.max(avgAlpha + avgTheta, 1e-10);
     const focus = Math.max(0, Math.min(1, engagementRatio / 2));
 
-    // Stress: high-beta proportion of total power
-    // High beta (20-30 Hz) correlates with anxiety/stress
-    const highBetaProportion = avgBeta * 0.6 / totalPower; // rough high-beta estimate
-    const stress = Math.max(0, Math.min(1, highBetaProportion * 3));
+    // Stress: inverted theta/beta ratio
+    // High beta + low theta = mental strain/stress; high theta + low beta = relaxed
+    // Theta/beta ratio is a well-validated EEG stress/attention marker
+    const thetaBetaRatio = avgTheta / Math.max(avgBeta, 1e-10);
+    // Invert: low ratio (low theta, high beta) → high stress
+    // Typical range: 0.5 (very stressed) to 3.0 (very relaxed)
+    const stress = Math.max(0, Math.min(1, 1 - (thetaBetaRatio - 0.5) / 2.5));
 
     const metrics = { valence, arousal, focus, stress };
     const label = classifyLabel(metrics);

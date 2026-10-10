@@ -20,7 +20,7 @@ class EmotionalState(BaseModel):
     arousal: float = Field(..., ge=0.0, le=1.0, description="Arousal: 0 (calm) to 1 (excited)")
     focus: float = Field(..., ge=0.0, le=1.0, description="Focus: 0 (distracted) to 1 (focused)")
     stress: float = Field(..., ge=0.0, le=1.0, description="Stress: 0 (relaxed) to 1 (stressed)")
-    label: str = Field(..., description="Human-readable emotional state label (e.g. 'tense', 'calm', 'focused')")
+    label: str = Field(..., description="Human-readable emotional state label (e.g. 'stressed', 'calm', 'focused', 'meditative')")
 
 
 class StoredState(EmotionalState):

@@ -31,10 +31,10 @@ async def test_ingest_and_get_state():
             "user_id": "test-user-1",
             "source": "simulation",
             "valence": -0.35,
-            "arousal": 0.72,
-            "focus": 0.41,
-            "stress": 0.68,
-            "label": "tense",
+            "arousal": 0.70,
+            "focus": 0.40,
+            "stress": 0.72,
+            "label": "stressed",
         }
         resp = await client.post("/state", json=state)
         assert resp.status_code == 200
@@ -47,8 +47,8 @@ async def test_ingest_and_get_state():
         assert resp.status_code == 200
         data = resp.json()
         assert data["user_id"] == "test-user-1"
-        assert data["label"] == "tense"
-        assert data["stress"] == 0.68
+        assert data["label"] == "stressed"
+        assert data["stress"] == 0.72
 
 
 @pytest.mark.anyio

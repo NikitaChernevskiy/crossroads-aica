@@ -5,11 +5,11 @@ import { MuseClient, type MuseConnectionStatus } from "../lib/muse-client";
 import type { EmotionalMetrics } from "../lib/eeg-processor";
 
 const SIMULATION_PROFILES: SimulationProfile[] = [
-  { name: "Calm & Focused", label: "calm", valence: 0.4, arousal: 0.3, focus: 0.8, stress: 0.15 },
-  { name: "Tense", label: "tense", valence: -0.35, arousal: 0.72, focus: 0.41, stress: 0.68 },
-  { name: "Fatigued", label: "fatigued", valence: -0.3, arousal: 0.15, focus: 0.25, stress: 0.35 },
+  { name: "Calm & Focused", label: "focused", valence: 0.4, arousal: 0.35, focus: 0.8, stress: 0.15 },
+  { name: "Stressed", label: "stressed", valence: -0.35, arousal: 0.7, focus: 0.4, stress: 0.72 },
+  { name: "Fatigued", label: "fatigued", valence: -0.25, arousal: 0.15, focus: 0.2, stress: 0.35 },
   { name: "Excited", label: "excited", valence: 0.6, arousal: 0.8, focus: 0.55, stress: 0.25 },
-  { name: "Anxious", label: "anxious", valence: -0.5, arousal: 0.75, focus: 0.3, stress: 0.8 },
+  { name: "Meditative", label: "meditative", valence: 0.2, arousal: 0.2, focus: 0.45, stress: 0.08 },
   { name: "Distracted", label: "distracted", valence: 0.0, arousal: 0.4, focus: 0.15, stress: 0.3 },
 ];
 

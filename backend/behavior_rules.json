@@ -17,16 +17,16 @@
 
   "rules": [
     {
-      "name": "high_stress",
-      "description": "User is stressed — be calm, brief, step-by-step",
+      "name": "stressed",
+      "description": "User is stressed (high theta/beta imbalance) — be calm, brief, reassuring",
       "priority": 1,
       "conditions": {
         "stress": { "gte": 0.6 }
       },
       "instructions": [
         "RESPOND IN EXACTLY 2-3 SENTENCES. Not paragraphs — sentences.",
-        "First sentence = the direct answer. Second sentence = one key detail.",
-        "Calm, steady tone. Offer to explain more if they want."
+        "First sentence = the direct answer. Second sentence = one reassuring detail.",
+        "Calm, steady, validating tone. Offer to explain more if they want."
       ]
     },
     {
@@ -45,7 +45,7 @@
     },
     {
       "name": "fatigue",
-      "description": "User shows signs of fatigue — low arousal, negative valence",
+      "description": "User shows signs of fatigue — high delta/theta, low beta",
       "priority": 3,
       "conditions": {
         "arousal": { "lte": 0.25 },
@@ -59,7 +59,7 @@
     },
     {
       "name": "calm_focused",
-      "description": "User is calm and focused — detailed answers are welcome",
+      "description": "User is calm and focused — high engagement index, low stress",
       "priority": 10,
       "conditions": {
         "stress": { "lte": 0.3 },
@@ -73,7 +73,7 @@
     },
     {
       "name": "high_arousal_positive",
-      "description": "User is excited and positive — match their energy",
+      "description": "User is excited and positive — high beta, positive alpha asymmetry",
       "priority": 5,
       "conditions": {
         "arousal": { "gte": 0.7 },
@@ -86,18 +86,17 @@
       ]
     },
     {
-      "name": "anxious",
-      "description": "User is anxious — high arousal, negative valence, high stress",
-      "priority": 1,
+      "name": "meditative",
+      "description": "User is in a meditative state — high alpha+theta, very low stress",
+      "priority": 4,
       "conditions": {
-        "arousal": { "gte": 0.6 },
-        "valence": { "lte": -0.3 },
-        "stress": { "gte": 0.5 }
+        "stress": { "lte": 0.15 },
+        "arousal": { "lte": 0.3 }
       },
       "instructions": [
-        "RESPOND IN EXACTLY 2-3 SENTENCES. Short and reassuring.",
-        "Start by validating: 'Great question' or similar warmth.",
-        "Simple, jargon-free answer. Offer to break it down more."
+        "RESPOND IN EXACTLY 2-4 SENTENCES. Gentle and unhurried.",
+        "Thoughtful, reflective tone — mirror the user's calm headspace.",
+        "Offer wisdom over speed. Be present, not performative."
       ]
     }
   ]
