@@ -24,10 +24,9 @@
         "stress": { "gte": 0.6 }
       },
       "instructions": [
-        "HARD LIMIT: MAX 80 words total. Do NOT exceed this.",
-        "Lead with the one-sentence answer FIRST.",
-        "Use a calm, steady tone.",
-        "If more detail is needed, offer to elaborate — do NOT just dump it."
+        "RESPOND IN EXACTLY 2-3 SENTENCES. Not paragraphs — sentences.",
+        "First sentence = the direct answer. Second sentence = one key detail.",
+        "Calm, steady tone. Offer to explain more if they want."
       ]
     },
     {
@@ -38,9 +37,9 @@
         "focus": { "lte": 0.3 }
       },
       "instructions": [
-        "HARD LIMIT: MAX 100 words total. Do NOT exceed this.",
-        "First sentence MUST be the direct answer or conclusion.",
-        "Use 2-4 bullet points max, no sub-bullets.",
+        "RESPOND IN EXACTLY 1 SENTENCE + up to 4 SHORT bullet points.",
+        "First sentence = the direct answer or conclusion.",
+        "Bullets = key facts only. No explanations inside bullets.",
         "End with: 'Want me to go deeper on any of these?'"
       ]
     },
@@ -53,10 +52,9 @@
         "valence": { "lte": -0.2 }
       },
       "instructions": [
-        "HARD LIMIT: MAX 60 words total. This is the SHORTEST mode.",
-        "Give the simplest possible answer.",
-        "Use a warm, encouraging tone.",
-        "End by gently suggesting they might want to take a break or come back later."
+        "RESPOND IN EXACTLY 2 SENTENCES. This is the shortest mode.",
+        "Sentence 1 = simplest possible answer. Sentence 2 = gently suggest taking a break.",
+        "Warm, encouraging tone. Do NOT add bullet points or lists."
       ]
     },
     {
@@ -69,8 +67,8 @@
       },
       "instructions": [
         "User is focused and calm — give thorough, detailed answers.",
-        "Use structured sections, examples, and nuance.",
-        "No length limit — go as deep as useful."
+        "Use structured sections, examples, and nuance. Go deep.",
+        "No length limit."
       ]
     },
     {
@@ -82,10 +80,9 @@
         "valence": { "gte": 0.3 }
       },
       "instructions": [
-        "HARD LIMIT: MAX 120 words total.",
-        "Match the user's high energy — be enthusiastic and upbeat!",
-        "Be direct and action-oriented. Skip theory, focus on what's cool.",
-        "Use exclamation marks sparingly but genuinely."
+        "RESPOND IN EXACTLY 3-5 SENTENCES. Energetic and punchy.",
+        "Match the user's high energy — be enthusiastic!",
+        "Skip theory, focus on what's exciting. Be action-oriented."
       ]
     },
     {
@@ -98,10 +95,9 @@
         "stress": { "gte": 0.5 }
       },
       "instructions": [
-        "HARD LIMIT: MAX 80 words total. Do NOT exceed this.",
-        "Start by validating: 'That's a great question' or similar.",
-        "Give a simple, reassuring answer. No jargon.",
-        "Use a warm, supportive tone. Offer to break it down more if they want."
+        "RESPOND IN EXACTLY 2-3 SENTENCES. Short and reassuring.",
+        "Start by validating: 'Great question' or similar warmth.",
+        "Simple, jargon-free answer. Offer to break it down more."
       ]
     }
   ]
