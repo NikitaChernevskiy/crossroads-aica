@@ -4,6 +4,8 @@
 
 Built for the [CrossRoads AI Hackathon Bulgaria 2026](https://www.startupbulgaria.eu/crossroads/ai-hackathon) by **AI Cloud Agency**.
 
+🎬 **Pitch & demo video:** source project in [`Video/`](Video/), built with Claude Code and [Remotion](https://www.remotion.dev/). See [Video/README.md](Video/README.md) for the storyboard, sources and how to render it.
+
 ---
 
 ## What It Does
@@ -87,6 +89,7 @@ crossroads-aica/
 │           ├── DevicePanel.tsx   # Simulation + Bluetooth
 │           ├── StateDisplay.tsx  # Real-time state visualization
 │           └── ChatPanel.tsx     # Chat UI
+├── Video/            # Pitch & demo video (Remotion project)
 ├── infra/            # Bicep IaC
 │   ├── main.bicep
 │   └── modules/      # Container Apps, ACR, Cosmos DB, Key Vault, App Insights, SWA

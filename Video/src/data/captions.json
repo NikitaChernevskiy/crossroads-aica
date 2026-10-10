@@ -1,0 +1,247 @@
+[
+  {
+    "text": "Help me plan my evening.",
+    "startMs": 300,
+    "endMs": 1955
+  },
+  {
+    "text": "Some days, I want a detailed plan",
+    "startMs": 2030,
+    "endMs": 3829
+  },
+  {
+    "text": "with options.",
+    "startMs": 3829,
+    "endMs": 4973
+  },
+  {
+    "text": "Other days, I'm overwhelmed, and I just",
+    "startMs": 5165,
+    "endMs": 7370
+  },
+  {
+    "text": "need one next step.",
+    "startMs": 7370,
+    "endMs": 8886
+  },
+  {
+    "text": "Same question.",
+    "startMs": 9147,
+    "endMs": 10296
+  },
+  {
+    "text": "Different needs.",
+    "startMs": 10296,
+    "endMs": 11696
+  },
+  {
+    "text": "AI Emotional Partner helps wellbeing apps build",
+    "startMs": 12300,
+    "endMs": 15342
+  },
+  {
+    "text": "that adaptation into their AI.",
+    "startMs": 15342,
+    "endMs": 17473
+  },
+  {
+    "text": "We don’t sell a wearable or a",
+    "startMs": 17733,
+    "endMs": 19196
+  },
+  {
+    "text": "chatbot.",
+    "startMs": 19196,
+    "endMs": 20079
+  },
+  {
+    "text": "We sell an integration layer to the",
+    "startMs": 20079,
+    "endMs": 21727
+  },
+  {
+    "text": "companies behind those apps.",
+    "startMs": 21727,
+    "endMs": 23742
+  },
+  {
+    "text": "Here's our working reference build, using simulated",
+    "startMs": 25300,
+    "endMs": 28098
+  },
+  {
+    "text": "input.",
+    "startMs": 28098,
+    "endMs": 28940
+  },
+  {
+    "text": "Same question, two estimated states.",
+    "startMs": 29073,
+    "endMs": 31715
+  },
+  {
+    "text": "Before answering, the agent calls get behavior",
+    "startMs": 31906,
+    "endMs": 34402
+  },
+  {
+    "text": "guidance.",
+    "startMs": 34402,
+    "endMs": 35256
+  },
+  {
+    "text": "Focused:",
+    "startMs": 35331,
+    "endMs": 36190
+  },
+  {
+    "text": "detail is welcome.",
+    "startMs": 36190,
+    "endMs": 37560
+  },
+  {
+    "text": "Tense:",
+    "startMs": 37560,
+    "endMs": 38280
+  },
+  {
+    "text": "be brief, calm, and go step by",
+    "startMs": 38280,
+    "endMs": 40196
+  },
+  {
+    "text": "step.",
+    "startMs": 40196,
+    "endMs": 40956
+  },
+  {
+    "text": "And the answer changes with it.",
+    "startMs": 41148,
+    "endMs": 43104
+  },
+  {
+    "text": "Health and fitness apps earned four point",
+    "startMs": 52300,
+    "endMs": 54576
+  },
+  {
+    "text": "five billion dollars from in-app purchases in",
+    "startMs": 54576,
+    "endMs": 57176
+  },
+  {
+    "text": "2025, according to Sensor Tower.",
+    "startMs": 57176,
+    "endMs": 60108
+  },
+  {
+    "text": "We start narrower:",
+    "startMs": 60299,
+    "endMs": 61646
+  },
+  {
+    "text": "wellbeing apps that already integrate wearables.",
+    "startMs": 61646,
+    "endMs": 64810
+  },
+  {
+    "text": "Apps pay a base subscription plus usage,",
+    "startMs": 66300,
+    "endMs": 68994
+  },
+  {
+    "text": "tied to active users with adaptation enabled.",
+    "startMs": 68994,
+    "endMs": 72018
+  },
+  {
+    "text": "Our path:",
+    "startMs": 72279,
+    "endMs": 73150
+  },
+  {
+    "text": "three paid pilots in one segment, then",
+    "startMs": 73150,
+    "endMs": 75553
+  },
+  {
+    "text": "standardize the integration and expand.",
+    "startMs": 75553,
+    "endMs": 78299
+  },
+  {
+    "text": "Most tools stop at a dashboard.",
+    "startMs": 81300,
+    "endMs": 83477
+  },
+  {
+    "text": "We turn estimated state indicators from wearables",
+    "startMs": 83610,
+    "endMs": 86606
+  },
+  {
+    "text": "into guidance an AI agent can act",
+    "startMs": 86606,
+    "endMs": 88754
+  },
+  {
+    "text": "on.",
+    "startMs": 88754,
+    "endMs": 89305
+  },
+  {
+    "text": "The question we’ll test:",
+    "startMs": 89497,
+    "endMs": 90936
+  },
+  {
+    "text": "is it better than a simple shorter-answer",
+    "startMs": 90936,
+    "endMs": 92922
+  },
+  {
+    "text": "button?",
+    "startMs": 92922,
+    "endMs": 93857
+  },
+  {
+    "text": "We’re a small team that combines Azure",
+    "startMs": 95300,
+    "endMs": 97320
+  },
+  {
+    "text": "engineering, product thinking and real understanding of",
+    "startMs": 97320,
+    "endMs": 100316
+  },
+  {
+    "text": "how people feel.",
+    "startMs": 100316,
+    "endMs": 101773
+  },
+  {
+    "text": "Next:",
+    "startMs": 105300,
+    "endMs": 105857
+  },
+  {
+    "text": "three paid pilots.",
+    "startMs": 105857,
+    "endMs": 107280
+  },
+  {
+    "text": "We're not building another AI companion.",
+    "startMs": 107471,
+    "endMs": 109770
+  },
+  {
+    "text": "We're helping wellbeing apps respond to the",
+    "startMs": 109770,
+    "endMs": 111929
+  },
+  {
+    "text": "person using them.",
+    "startMs": 111929,
+    "endMs": 113398
+  }
+]

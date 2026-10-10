@@ -1,0 +1,28 @@
+{
+  "source": "crossroads-aica backend: BehaviorRulesEngine.evaluate() with behavior_rules.json v1.0.0, captured 2026-10-10",
+  "focused": {
+    "state": "focused",
+    "fresh": true,
+    "age_sec": 0,
+    "instructions": [
+      "User is focused and calm — detailed answers are welcome",
+      "Feel free to provide thorough explanations",
+      "Include relevant context and nuance"
+    ]
+  },
+  "tense": {
+    "state": "tense",
+    "fresh": true,
+    "age_sec": 0,
+    "instructions": [
+      "Respond briefly and calmly",
+      "Lead with the main conclusion",
+      "Guide the user step by step",
+      "Avoid overwhelming with details",
+      "User appears anxious — be reassuring and structured",
+      "Break information into small, manageable pieces",
+      "Validate their concerns before providing solutions",
+      "Use a warm, supportive tone"
+    ]
+  }
+}
