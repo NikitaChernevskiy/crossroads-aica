@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { EmotionalState, SimulationProfile } from "../types";
-import { postState } from "../api";
+import { postState, postCalibrationBatch } from "../api";
 import { MuseClient, type MuseConnectionStatus } from "../lib/muse-client";
 import type { EmotionalMetrics } from "../lib/eeg-processor";
+import type { CalibratedSample } from "../lib/eeg-processor";
 import { LiveChart, type MetricSnapshot } from "./LiveChart";
 
 const MAX_CHART_POINTS = 60; // ~30s at 2 pts/sec
@@ -48,6 +49,13 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
 
   // Live chart data (rolling buffer of recent EEG metrics)
   const [chartData, setChartData] = useState<MetricSnapshot[]>([]);
+
+  // Calibration state
+  const [calibrating, setCalibrating] = useState(false);
+  const [calibrationCount, setCalibrationCount] = useState(0);
+  const calibrationBufRef = useRef<CalibratedSample[]>([]);
+  const calibrationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const calibrationFlushRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep profile ref in sync for the fast chart ticker
   useEffect(() => { activeProfileRef.current = activeProfile; }, [activeProfile]);
@@ -231,6 +239,63 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
     onDisconnect();
   }, [onDisconnect]);
 
+  // ── Calibration Mode ────────────────────────────────────────────────────
+
+  const startCalibration = useCallback(() => {
+    if (!museRef.current) return;
+    setCalibrating(true);
+    setCalibrationCount(0);
+    calibrationBufRef.current = [];
+
+    // Collect calibrated samples every 500ms from the Muse processor
+    calibrationTimerRef.current = setInterval(() => {
+      const sample = museRef.current?.lastCalibratedSample;
+      if (sample) {
+        calibrationBufRef.current.push(sample);
+        setCalibrationCount(c => c + 1);
+      }
+    }, 500);
+
+    // Flush batches to backend every 5s
+    calibrationFlushRef.current = setInterval(async () => {
+      const buf = calibrationBufRef.current;
+      if (buf.length === 0) return;
+      calibrationBufRef.current = [];
+      try {
+        await postCalibrationBatch(userId, buf as unknown as Record<string, unknown>[]);
+        console.info(`[Calibrate] Flushed ${buf.length} samples to backend`);
+      } catch (err) {
+        console.error("[Calibrate] Flush failed:", err);
+      }
+    }, 5000);
+
+    // Auto-stop after 60s
+    setTimeout(() => stopCalibration(), 60_000);
+  }, [userId]);
+
+  const stopCalibration = useCallback(async () => {
+    if (calibrationTimerRef.current) {
+      clearInterval(calibrationTimerRef.current);
+      calibrationTimerRef.current = null;
+    }
+    // Final flush
+    const buf = calibrationBufRef.current;
+    calibrationBufRef.current = [];
+    if (buf.length > 0) {
+      try {
+        await postCalibrationBatch(userId, buf as unknown as Record<string, unknown>[]);
+        console.info(`[Calibrate] Final flush: ${buf.length} samples`);
+      } catch (err) {
+        console.error("[Calibrate] Final flush failed:", err);
+      }
+    }
+    if (calibrationFlushRef.current) {
+      clearInterval(calibrationFlushRef.current);
+      calibrationFlushRef.current = null;
+    }
+    setCalibrating(false);
+  }, [userId]);
+
   // ── Cleanup ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -238,6 +303,8 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (chartTickRef.current) clearInterval(chartTickRef.current);
       if (btSendRef.current) clearInterval(btSendRef.current);
+      if (calibrationTimerRef.current) clearInterval(calibrationTimerRef.current);
+      if (calibrationFlushRef.current) clearInterval(calibrationFlushRef.current);
       museRef.current?.disconnect();
     };
   }, []);
@@ -369,6 +436,37 @@ export function DevicePanel({ connected, onConnect, onDisconnect, onStateUpdate,
 
               {btStatus === "connected" && (
                 <LiveChart data={chartData} height={110} />
+              )}
+
+              {/* Calibration button — visible when BT connected */}
+              {btStatus === "connected" && (
+                <div className="space-y-2">
+                  {!calibrating ? (
+                    <button
+                      onClick={startCalibration}
+                      className="w-full py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition"
+                    >
+                      Calibrate (60s)
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-800 rounded-lg px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                          <span className="text-xs text-amber-300">
+                            Calibrating… {calibrationCount} samples
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={stopCalibration}
+                        className="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs transition"
+                      >
+                        Stop
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
 
               {btStatus !== "connected" ? (

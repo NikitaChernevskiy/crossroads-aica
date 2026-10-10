@@ -11,7 +11,7 @@
  * The Muse sends 12 EEG samples per BLE notification at 256 Hz.
  */
 
-import { EEGProcessor, ELECTRODES, type EmotionalMetrics } from "./eeg-processor";
+import { EEGProcessor, ELECTRODES, type EmotionalMetrics, type CalibratedSample } from "./eeg-processor";
 
 // Muse BLE UUIDs
 const MUSE_SERVICE = 0xfe8d;
@@ -86,6 +86,11 @@ export class MuseClient {
 
   get deviceName(): string {
     return this.device?.name || "Unknown Muse";
+  }
+
+  /** Get the latest calibrated sample with band powers (for calibration collection). */
+  get lastCalibratedSample(): CalibratedSample | null {
+    return this.processor.lastCalibratedSample;
   }
 
   private setStatus(status: MuseConnectionStatus): void {

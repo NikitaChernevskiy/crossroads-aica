@@ -37,6 +37,18 @@ export interface EmotionalMetrics {
   label: string;
 }
 
+/** Extended metrics with raw band powers — used for calibration data. */
+export interface CalibratedSample extends EmotionalMetrics {
+  delta: number;
+  theta: number;
+  alpha: number;
+  beta: number;
+  gamma: number;
+  faa: number;       // frontal alpha asymmetry
+  thetaBeta: number; // theta/beta ratio
+  timestamp: number; // Date.now()
+}
+
 const SAMPLE_RATE = 256; // Muse sample rate in Hz
 const WINDOW_SIZE = 256; // 1 second window for FFT
 
@@ -211,7 +223,23 @@ export class EEGProcessor {
       'color:#888', 'color:#6ee7b7;font-weight:bold', 'color:#888'
     );
 
+    // Store latest calibrated sample (band powers + ratios) for calibration mode
+    this._lastCalibratedSample = {
+      ...metrics, label,
+      delta: avg(bp => bp.delta),
+      theta: avgTheta, alpha: avgAlpha, beta: avgBeta,
+      gamma: avg(bp => bp.gamma),
+      faa: alphaAsymmetry, thetaBeta: thetaBetaRatio,
+      timestamp: Date.now(),
+    };
+
     return { ...metrics, label };
+  }
+
+  /** Last computed sample with full calibration data. */
+  private _lastCalibratedSample: CalibratedSample | null = null;
+  get lastCalibratedSample(): CalibratedSample | null {
+    return this._lastCalibratedSample;
   }
 
   /** Reset all buffers. */

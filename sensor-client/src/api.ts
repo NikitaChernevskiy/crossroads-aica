@@ -33,6 +33,20 @@ export interface ChatResult {
   state_label: string | null;
 }
 
+/** Post a batch of calibration samples to the backend. */
+export async function postCalibrationBatch(
+  userId: string,
+  samples: Record<string, unknown>[]
+): Promise<{ stored: number }> {
+  const resp = await fetch(`${API_BASE}/calibrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, samples }),
+  });
+  if (!resp.ok) throw new Error(`POST /calibrate failed: ${resp.status}`);
+  return resp.json();
+}
+
 /** Send a chat message to the backend and get a response. */
 export async function sendChatMessage(
   userId: string,

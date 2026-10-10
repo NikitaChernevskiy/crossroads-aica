@@ -128,6 +128,132 @@ async def health_check():
     return HealthResponse(storage=storage_type)
 
 
+# ── Calibration Endpoints ──────────────────────────────────────────────────────
+
+
+@app.post("/calibrate")
+async def ingest_calibration_batch(batch: dict):
+    """Store a batch of EEG calibration samples.
+
+    Accepts: { user_id, samples: [ {valence, arousal, focus, stress, label,
+    delta, theta, alpha, beta, gamma, faa, thetaBeta, timestamp}, ... ] }
+
+    Stores each sample in Cosmos with source='calibration' for later analysis.
+    Returns count of stored samples.
+    """
+    user_id = batch.get("user_id", "unknown")
+    samples = batch.get("samples", [])
+    if not samples:
+        return {"status": "ok", "stored": 0}
+
+    from datetime import datetime, timezone
+    stored = 0
+    for s in samples:
+        state = EmotionalState(
+            user_id=user_id,
+            source="calibration",
+            timestamp=datetime.fromtimestamp(s.get("timestamp", 0) / 1000, tz=timezone.utc),
+            valence=max(-1, min(1, s.get("valence", 0))),
+            arousal=max(0, min(1, s.get("arousal", 0))),
+            focus=max(0, min(1, s.get("focus", 0))),
+            stress=max(0, min(1, s.get("stress", 0))),
+            label=s.get("label", "unknown"),
+        )
+        # Save with extra band power fields via raw doc
+        doc_id = await store.save_state(state)
+        # Patch extra calibration fields into Cosmos doc
+        if hasattr(store, '_container') and store._container is not None:
+            try:
+                await store._container.upsert_item({
+                    "id": doc_id, "user_id": user_id,
+                    "source": "calibration",
+                    "timestamp": state.timestamp.isoformat(),
+                    "valence": state.valence, "arousal": state.arousal,
+                    "focus": state.focus, "stress": state.stress,
+                    "label": state.label,
+                    "delta": s.get("delta", 0), "theta": s.get("theta", 0),
+                    "alpha": s.get("alpha", 0), "beta": s.get("beta", 0),
+                    "gamma": s.get("gamma", 0),
+                    "faa": s.get("faa", 0), "thetaBeta": s.get("thetaBeta", 0),
+                })
+            except Exception:
+                pass  # band powers are best-effort
+        stored += 1
+
+    logger.info("[CALIBRATE] user=%s stored %d samples", user_id, stored)
+    return {"status": "ok", "stored": stored}
+
+
+@app.get("/calibrate/{user_id}/summary")
+async def calibration_summary(user_id: str, minutes: int = 60):
+    """Compute calibration statistics from recent EEG data.
+
+    Returns min/max/avg/stddev for each metric and band power,
+    plus label distribution. Use this to understand a user's personal
+    EEG baseline and adjust thresholds accordingly.
+    """
+    import math
+
+    # Fetch calibration samples from Cosmos
+    if hasattr(store, '_container') and store._container is not None:
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        query = (
+            "SELECT * FROM c WHERE c.user_id = @uid "
+            "AND c.source = 'calibration' "
+            "AND c.timestamp >= @cutoff ORDER BY c.timestamp DESC"
+        )
+        params = [
+            {"name": "@uid", "value": user_id},
+            {"name": "@cutoff", "value": cutoff},
+        ]
+        items = [
+            item async for item in store._container.query_items(
+                query, parameters=params, partition_key=user_id
+            )
+        ]
+    else:
+        # In-memory fallback
+        items = []
+
+    if not items:
+        return {"user_id": user_id, "count": 0, "message": "No calibration data found"}
+
+    # Compute stats for each numeric field
+    fields = ["valence", "arousal", "focus", "stress",
+              "delta", "theta", "alpha", "beta", "gamma", "faa", "thetaBeta"]
+
+    stats = {}
+    for f in fields:
+        values = [item.get(f, 0) for item in items if f in item]
+        if not values:
+            continue
+        n = len(values)
+        mean = sum(values) / n
+        variance = sum((v - mean) ** 2 for v in values) / n if n > 1 else 0
+        stats[f] = {
+            "min": round(min(values), 4),
+            "max": round(max(values), 4),
+            "avg": round(mean, 4),
+            "stddev": round(math.sqrt(variance), 4),
+            "count": n,
+        }
+
+    # Label distribution
+    labels: dict[str, int] = {}
+    for item in items:
+        lbl = item.get("label", "unknown")
+        labels[lbl] = labels.get(lbl, 0) + 1
+
+    return {
+        "user_id": user_id,
+        "minutes": minutes,
+        "total_samples": len(items),
+        "stats": stats,
+        "label_distribution": labels,
+    }
+
+
 @app.post("/rules/reload")
 async def reload_rules():
     """Hot-reload behavior rules from disk (admin endpoint)."""
