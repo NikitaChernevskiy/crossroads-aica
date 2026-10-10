@@ -1,15 +1,17 @@
-"""AI Foundry Agent Service — manages the AI assistant, threads, and tool calls.
+"""AI Foundry Agent Service — manages conversations with behavior-adaptive AI.
 
 Architecture:
-  1. An Assistant is created in the Azure AI Foundry project with function tools
-  2. Each conversation gets a Thread (maintains full chat history server-side)
-  3. When the user sends a message, a Run is created on the thread
-  4. The assistant may call `get_behavior_guidance` tool → backend evaluates rules
-  5. The assistant uses the guidance to adapt its response tone/style/length
+  1. Azure OpenAI (connected to AI Foundry hub) provides the chat model
+  2. Each conversation gets a thread_id (UUID) with full message history in memory
+  3. Before each response, the agent fetches behavior guidance from the rules engine
+     (same logic exposed via MCP tools at /mcp)
+  4. Guidance is injected into the system prompt so the AI adapts tone/style/length
+  5. Full conversation history is sent with each request → the AI remembers context
 """
 
-import json
 import logging
+import uuid
+from collections import defaultdict
 from typing import Optional
 
 from openai import AsyncAzureOpenAI
@@ -20,53 +22,30 @@ from app.rules import BehaviorRulesEngine
 
 logger = logging.getLogger(__name__)
 
-ASSISTANT_INSTRUCTIONS = """\
+SYSTEM_PROMPT_BASE = """\
 You are an empathetic AI assistant powered by the AI Emotional Partner system.
-You have access to a tool called `get_behavior_guidance` that reads the user's
-real-time emotional state from their wellbeing sensors (EEG headband, etc.) and
-returns behavior instructions you MUST follow.
+You have access to real-time emotional context from the user's wellbeing sensors
+(EEG headband, fitness tracker, etc.). Your role is to be helpful, warm, and
+adaptive — adjusting your communication style based on the user's current
+emotional and cognitive state.
 
-## How to Use the Tool
-- Call `get_behavior_guidance` at the START of every conversation turn before you
-  compose your reply. Pass the user_id you receive.
-- Read the returned `instructions` array and follow every instruction.
-- If the state is `stale` or `unknown`, respond normally but warmly.
-
-## Core Principles
-- Be genuine and caring, never robotic.
-- Adapt your tone, length, and complexity per the instructions.
-- If the user is stressed → be calming and concise.
-- If the user is focused → match their energy with clear, structured responses.
-- If the user is fatigued → be gentle and offer to simplify.
-- Never explicitly say you are reading brain signals — just naturally adapt.
-- You may acknowledge the user's mood casually if appropriate ("You seem calm today").
+Core principles:
+- Be genuine and caring, never robotic
+- Adapt your tone, length, and complexity to the user's state
+- If the user is stressed → be calming, concise, and reassuring
+- If the user is focused → match their energy with clear, structured responses
+- If the user is fatigued → be gentle, brief, and offer to simplify
+- If the user is excited → be enthusiastic and engaging
+- Never explicitly say you are reading brain signals — just naturally adapt
+- You may acknowledge the user's mood casually if appropriate
 """
 
-BEHAVIOR_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "get_behavior_guidance",
-        "description": (
-            "Get behavior instructions for adapting your response based on the "
-            "user's current emotional state from their wellbeing sensors. "
-            "ALWAYS call this tool before composing your reply."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "user_id": {
-                    "type": "string",
-                    "description": "The user's identifier",
-                }
-            },
-            "required": ["user_id"],
-        },
-    },
-}
+# Max messages to keep per thread (prevent unbounded memory growth)
+MAX_HISTORY = 50
 
 
 class AgentService:
-    """Manages the AI Foundry Assistant, threads, and function-tool calls."""
+    """Manages conversations with behavior guidance from the MCP tools layer."""
 
     def __init__(
         self,
@@ -77,36 +56,16 @@ class AgentService:
         self.client = openai_client
         self.store = store
         self.engine = engine
-        self.assistant_id: str | None = None
+        # Thread storage: thread_id → list of {"role": ..., "content": ...}
+        self._threads: dict[str, list[dict]] = defaultdict(list)
 
     async def initialize(self) -> None:
-        """Create (or reuse) the AI Assistant in Azure OpenAI."""
-        # Check for an existing assistant we created earlier
-        try:
-            assistants = await self.client.beta.assistants.list(limit=20)
-            for a in assistants.data:
-                if a.name == "AI Emotional Partner":
-                    self.assistant_id = a.id
-                    logger.info("Reusing existing assistant %s", a.id)
-                    # Update instructions in case they changed
-                    await self.client.beta.assistants.update(
-                        assistant_id=a.id,
-                        instructions=ASSISTANT_INSTRUCTIONS,
-                        tools=[BEHAVIOR_TOOL],
-                    )
-                    return
-        except Exception as e:
-            logger.warning("Could not list assistants: %s", e)
-
-        # Create new assistant
-        assistant = await self.client.beta.assistants.create(
-            model=settings.azure_openai_deployment,
-            name="AI Emotional Partner",
-            instructions=ASSISTANT_INSTRUCTIONS,
-            tools=[BEHAVIOR_TOOL],
+        """Verify the OpenAI connection works."""
+        logger.info(
+            "AgentService initialized (deployment=%s, endpoint=%s)",
+            settings.azure_openai_deployment,
+            settings.azure_openai_endpoint[:40] + "...",
         )
-        self.assistant_id = assistant.id
-        logger.info("Created new assistant %s", assistant.id)
 
     async def chat(
         self,
@@ -114,115 +73,63 @@ class AgentService:
         message: str,
         thread_id: Optional[str] = None,
     ) -> tuple[str, str, bool, Optional[str]]:
-        """Process a chat message through the AI Agent.
+        """Process a chat message with full conversation history.
 
         Returns:
             (thread_id, response_text, guidance_used, state_label)
         """
-        if self.assistant_id is None:
-            raise RuntimeError("Agent not initialized")
-
         # 1. Create or reuse thread
-        if thread_id:
-            # Verify thread exists
-            try:
-                await self.client.beta.threads.retrieve(thread_id)
-            except Exception:
-                logger.warning("Thread %s not found, creating new one", thread_id)
-                thread_id = None
+        if not thread_id or thread_id not in self._threads:
+            thread_id = str(uuid.uuid4())
+            self._threads[thread_id] = []
+            logger.info("New thread %s for user %s", thread_id, user_id)
 
-        if not thread_id:
-            thread = await self.client.beta.threads.create()
-            thread_id = thread.id
-            logger.info("Created new thread %s for user %s", thread_id, user_id)
+        history = self._threads[thread_id]
 
-        # 2. Add user message to thread
-        await self.client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=message,
+        # 2. Get behavior guidance (same logic as MCP get_behavior_guidance tool)
+        state = await self.store.get_current_state(user_id)
+        guidance = self.engine.evaluate(state)
+
+        guidance_block = "\n".join(f"- {i}" for i in guidance.instructions)
+        system_prompt = (
+            f"{SYSTEM_PROMPT_BASE}\n"
+            f"## Current Emotional State\n"
+            f"- State: {guidance.state}\n"
+            f"- Freshness: {'fresh' if guidance.fresh else 'stale'}"
+            f" ({guidance.age_sec}s ago)\n\n"
+            f"## Behavior Instructions (follow these)\n"
+            f"{guidance_block}\n"
         )
 
-        # 3. Create a run (assistant processes the thread)
-        run = await self.client.beta.threads.runs.create(
-            thread_id=thread_id,
-            assistant_id=self.assistant_id,
-            # Pass user_id as additional context
-            additional_instructions=f"The current user_id is: {user_id}",
-        )
+        # 3. Append user message to history
+        history.append({"role": "user", "content": message})
 
-        # 4. Poll until completion, handling tool calls
-        guidance_used = False
-        state_label = None
+        # Trim history if too long (keep system prompt + recent messages)
+        if len(history) > MAX_HISTORY:
+            history[:] = history[-MAX_HISTORY:]
 
-        while True:
-            run = await self.client.beta.threads.runs.retrieve(
-                thread_id=thread_id,
-                run_id=run.id,
-            )
+        # 4. Build full message list: system + history
+        messages = [{"role": "system", "content": system_prompt}] + history
 
-            if run.status == "completed":
-                break
-            elif run.status == "requires_action":
-                # Handle tool calls
-                tool_outputs = []
-                for tc in run.required_action.submit_tool_outputs.tool_calls:
-                    output, used, label = await self._handle_tool_call(tc)
-                    tool_outputs.append(
-                        {"tool_call_id": tc.id, "output": output}
-                    )
-                    if used:
-                        guidance_used = True
-                        state_label = label
-
-                run = await self.client.beta.threads.runs.submit_tool_outputs(
-                    thread_id=thread_id,
-                    run_id=run.id,
-                    tool_outputs=tool_outputs,
-                )
-            elif run.status in ("failed", "cancelled", "expired"):
-                error_msg = getattr(run, "last_error", None)
-                logger.error("Run %s failed: %s — %s", run.id, run.status, error_msg)
-                raise RuntimeError(f"Agent run {run.status}: {error_msg}")
-            else:
-                # Still in progress (queued, in_progress, cancelling)
-                import asyncio
-                await asyncio.sleep(0.5)
-
-        # 5. Get the assistant's response (latest message)
-        messages = await self.client.beta.threads.messages.list(
-            thread_id=thread_id,
-            order="desc",
-            limit=1,
-        )
-        if messages.data:
-            response_text = messages.data[0].content[0].text.value
-        else:
-            response_text = "I'm here for you."
-
-        return thread_id, response_text, guidance_used, state_label
-
-    async def _handle_tool_call(self, tool_call) -> tuple[str, bool, Optional[str]]:
-        """Process a function tool call from the assistant.
-
-        Returns:
-            (json_output, guidance_used, state_label)
-        """
-        fn_name = tool_call.function.name
+        # 5. Call Azure OpenAI via Foundry connection
         try:
-            args = json.loads(tool_call.function.arguments)
-        except json.JSONDecodeError:
-            args = {}
-
-        if fn_name == "get_behavior_guidance":
-            user_id = args.get("user_id", "")
-            state = await self.store.get_current_state(user_id)
-            guidance = self.engine.evaluate(state)
-            return (
-                json.dumps(guidance.model_dump()),
-                guidance.fresh,
-                guidance.state if guidance.state != "unknown" else None,
+            completion = await self.client.chat.completions.create(
+                model=settings.azure_openai_deployment,
+                messages=messages,
+                max_tokens=800,
+                temperature=0.7,
             )
-        else:
-            logger.warning("Unknown tool call: %s", fn_name)
-            return json.dumps({"error": f"Unknown tool: {fn_name}"}), False, None
+            response_text = completion.choices[0].message.content or "I'm here for you."
+        except Exception as e:
+            logger.error("Azure OpenAI call failed: %s", e)
+            raise
+
+        # 6. Append assistant response to history
+        history.append({"role": "assistant", "content": response_text})
+
+        return (
+            thread_id,
+            response_text,
+            guidance.fresh,
+            guidance.state if guidance.state != "unknown" else None,
+        )
