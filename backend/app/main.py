@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
         )
         agent_service = AgentService(oai_client, store, engine)
         await agent_service.initialize()
-        logger.info("AI Foundry Agent Service initialized (assistant=%s)", agent_service.assistant_id)
+        logger.info("AI Foundry Agent Service initialized")
     else:
         logger.warning("Azure OpenAI not configured — /chat endpoint will be unavailable")
     yield
