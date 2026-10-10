@@ -83,6 +83,11 @@ def get_behavior_guidance(user_id: str) -> str:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             state = pool.submit(asyncio.run, _store.get_current_state(user_id)).result(timeout=10)
         guidance = _engine.evaluate(state)
+        logger.info(
+            "[GUIDANCE] user=%s state=%s fresh=%s age=%ds instructions=%s",
+            user_id, guidance.state, guidance.fresh, guidance.age_sec,
+            guidance.instructions[:1],  # first instruction as preview
+        )
         return json.dumps(guidance.model_dump())
     except Exception as e:
         logger.warning("get_behavior_guidance failed for %s: %s", user_id, e)

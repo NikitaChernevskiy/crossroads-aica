@@ -1,12 +1,15 @@
 """Behavior rules engine — maps emotional state to agent instructions."""
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from app.config import settings
 from app.models import BehaviorGuidance, StoredState
+
+logger = logging.getLogger(__name__)
 
 # Default rules file path
 RULES_PATH = Path(__file__).parent.parent / "behavior_rules.json"
@@ -90,8 +93,14 @@ class BehaviorRulesEngine:
                 best_priority = priority
 
         if best_rule:
-            return best_rule.get("instructions", [])
+            instructions = best_rule.get("instructions", [])
+            logger.info(
+                "[RULES] Matched rule '%s' (priority=%s) → %d instructions",
+                best_rule.get("name"), best_rule.get("priority"), len(instructions),
+            )
+            return instructions
 
+        logger.info("[RULES] No rule matched — using default")
         # No rules matched — use calm/focused default
         return self._rules.get("default_fresh_instructions", [
             "User appears balanced — respond with normal detail and tone"

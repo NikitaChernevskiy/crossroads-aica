@@ -11,7 +11,7 @@
  * The Muse sends 12 EEG samples per BLE notification at 256 Hz.
  */
 
-import { EEGProcessor, type EmotionalMetrics } from "./eeg-processor";
+import { EEGProcessor, ELECTRODES, type EmotionalMetrics } from "./eeg-processor";
 
 // Muse BLE UUIDs
 const MUSE_SERVICE = 0xfe8d;
@@ -125,6 +125,7 @@ export class MuseClient {
 
       // Connect to GATT server
       this.server = await this.device.gatt!.connect();
+      console.info(`[Muse] Connected to GATT server: ${this.device.name}`);
 
       // Get the Muse service
       const service = await this.server.getPrimaryService(MUSE_SERVICE);
@@ -146,6 +147,7 @@ export class MuseClient {
         try {
           const characteristic = await service.getCharacteristic(uuid);
           await characteristic.startNotifications();
+          console.info(`[Muse] Subscribed to EEG channel ${channel} (${ELECTRODES[channel]})`);
           characteristic.addEventListener(
             "characteristicvaluechanged",
             (event: Event) => {

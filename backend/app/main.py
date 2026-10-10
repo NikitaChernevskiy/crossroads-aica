@@ -84,6 +84,11 @@ async def ingest_state(state: EmotionalState):
     Any device adapter sends the unified state format here.
     The server stores it and makes it available via MCP tools.
     """
+    logger.info(
+        "[STATE] user=%s source=%s label=%s  v=%.2f a=%.2f f=%.2f s=%.2f",
+        state.user_id, state.source, state.label,
+        state.valence, state.arousal, state.focus, state.stress,
+    )
     doc_id = await store.save_state(state)
     return StateResponse(id=doc_id)
 
@@ -95,6 +100,25 @@ async def get_current_state(user_id: str):
     if state is None:
         raise HTTPException(status_code=404, detail="No state found for this user")
     return state.model_dump(mode="json")
+
+
+@app.get("/state/{user_id}/history")
+async def get_state_history(user_id: str, minutes: int = 30):
+    """Get emotional state history for calibration review.
+
+    Returns the last N minutes of state snapshots from Cosmos DB,
+    newest first. Use this to inspect real EEG data during calibration.
+
+    Query params:
+        minutes: how far back to look (default 30)
+    """
+    states = await store.get_state_history(user_id, minutes)
+    return {
+        "user_id": user_id,
+        "minutes": minutes,
+        "count": len(states),
+        "states": [s.model_dump(mode="json") for s in states],
+    }
 
 
 @app.get("/health", response_model=HealthResponse)

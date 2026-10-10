@@ -205,6 +205,12 @@ export class EEGProcessor {
     const metrics = { valence, arousal, focus, stress };
     const label = classifyLabel(metrics);
 
+    // Calibration logging — visible in browser DevTools console
+    console.debug(
+      `%c[EEG] %c${label}%c  v=${valence.toFixed(2)} a=${arousal.toFixed(2)} f=${focus.toFixed(2)} s=${stress.toFixed(2)}  |  δ=${avg(bp => bp.delta).toFixed(1)} θ=${avgTheta.toFixed(1)} α=${avgAlpha.toFixed(1)} β=${avgBeta.toFixed(1)} γ=${avg(bp => bp.gamma).toFixed(1)}  |  FAA=${alphaAsymmetry.toFixed(2)} θ/β=${thetaBetaRatio.toFixed(2)}`,
+      'color:#888', 'color:#6ee7b7;font-weight:bold', 'color:#888'
+    );
+
     return { ...metrics, label };
   }
 
