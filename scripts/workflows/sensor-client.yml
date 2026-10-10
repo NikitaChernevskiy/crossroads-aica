@@ -1,0 +1,74 @@
+name: Sensor Client CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sensor-client/**"
+      - ".github/workflows/sensor-client.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "sensor-client/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sensor-client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: sensor-client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ vars.BACKEND_URL || 'https://ca-emopartner.yellowmushroom-88dc92a5.swedencentral.azurecontainerapps.io' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sensor-client-dist
+          path: sensor-client/dist
+
+  deploy:
+    name: Deploy to Static Web App
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sensor-client-dist
+          path: sensor-client/dist
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: sensor-client/dist
+          skip_app_build: true
