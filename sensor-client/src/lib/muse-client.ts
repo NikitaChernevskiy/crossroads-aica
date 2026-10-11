@@ -98,6 +98,44 @@ export class MuseClient {
     this.callbacks.onStatusChange(status);
   }
 
+  /** Small delay helper — lets the BLE stack stabilize. */
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Connect to GATT server with retry logic.
+   * Muse S Athena often drops the GATT connection before service discovery
+   * completes. Retrying with a stabilization delay fixes this.
+   */
+  private async connectGATT(maxRetries = 3): Promise<BluetoothRemoteGATTServer> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const server = await this.device!.gatt!.connect();
+        // Wait for the BLE stack to stabilize before service discovery
+        await this.delay(300);
+        // Verify the connection is still alive
+        if (!server.connected) {
+          throw new Error("GATT server disconnected immediately after connect");
+        }
+        console.info(`[Muse] GATT connected (attempt ${attempt}/${maxRetries}): ${this.device!.name}`);
+        return server;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Muse] GATT connect attempt ${attempt}/${maxRetries} failed: ${msg}`);
+        if (attempt < maxRetries) {
+          // Exponential backoff: 500ms, 1000ms, 2000ms
+          const backoff = 500 * Math.pow(2, attempt - 1);
+          console.info(`[Muse] Retrying in ${backoff}ms...`);
+          await this.delay(backoff);
+        } else {
+          throw err;
+        }
+      }
+    }
+    throw new Error("GATT connection failed after all retries");
+  }
+
   /**
    * Request Bluetooth device and connect.
    * Must be called from a user gesture (button click).
@@ -128,25 +166,35 @@ export class MuseClient {
         this.handleDisconnect();
       });
 
-      // Connect to GATT server
-      this.server = await this.device.gatt!.connect();
-      console.info(`[Muse] Connected to GATT server: ${this.device.name}`);
+      // Connect to GATT server with retry logic
+      this.server = await this.connectGATT(3);
 
-      // Get the Muse service
-      const service = await this.server.getPrimaryService(MUSE_SERVICE);
+      // Get the Muse service — retry once if GATT drops during discovery
+      let service: BluetoothRemoteGATTService;
+      try {
+        service = await this.server.getPrimaryService(MUSE_SERVICE);
+      } catch (serviceErr) {
+        console.warn("[Muse] Service discovery failed, reconnecting GATT...", serviceErr);
+        this.server = await this.connectGATT(2);
+        service = await this.server.getPrimaryService(MUSE_SERVICE);
+      }
 
-      // Get control characteristic and send start command
+      // Send halt then start command — resets the Muse's streaming state
       try {
         const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
-        // Send "p" command to start streaming (Muse protocol)
         const encoder = new TextEncoder();
+        // Send "h" (halt) first to reset any stale stream, then "p" (start)
+        await control.writeValue(encoder.encode("h"));
+        await this.delay(100);
         await control.writeValue(encoder.encode("p"));
+        console.info("[Muse] Sent h→p stream control commands");
       } catch {
         // Some Muse firmware versions don't need the start command
-        console.warn("Could not send start command — continuing anyway");
+        console.warn("[Muse] Could not send stream commands — continuing anyway");
       }
 
       // Subscribe to EEG channels
+      let subscribedChannels = 0;
       for (const [channelStr, uuid] of Object.entries(EEG_CHARACTERISTICS)) {
         const channel = parseInt(channelStr);
         try {
@@ -163,10 +211,16 @@ export class MuseClient {
               }
             }
           );
+          subscribedChannels++;
         } catch (err) {
-          console.warn(`Could not subscribe to EEG channel ${channel}:`, err);
+          console.warn(`[Muse] Could not subscribe to EEG channel ${channel}:`, err);
         }
       }
+
+      if (subscribedChannels === 0) {
+        throw new Error("Failed to subscribe to any EEG channels");
+      }
+      console.info(`[Muse] Subscribed to ${subscribedChannels}/4 EEG channels`);
 
       // Start computing metrics every 500ms
       this.metricsInterval = setInterval(() => {
