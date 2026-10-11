@@ -223,139 +223,128 @@ export class MuseClient {
         console.warn("[Muse] Could not enumerate characteristics:", discErr);
       }
 
-      // ── Step 2: Initialize control channel (halt → preset) ──────────
-      // The control characteristic (273e0001) only supports writeWithoutResponse,
-      // NOT write-with-response. Using writeValue() silently fails on some
-      // firmware versions. Commands use Muse's packet format: [length, ...cmd, \n]
-      try {
-        const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
-        const writeCmd = async (cmd: string) => {
-          const packet = encodeMuseCommand(cmd);
-          console.info(`[Muse] Sending command '${cmd}': [${Array.from(packet).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
-          await control.writeValueWithoutResponse(packet);
-        };
+      // ── Step 2: Subscribe to ALL data channels BEFORE sending start ──
+      // CRITICAL: The Muse only streams data to characteristics that already
+      // have notifications enabled. We MUST subscribe first, then send the
+      // start command. This is the standard BLE notification pattern.
+      let subscribedChannels = 0;
+      let packetLogCount = 0;
 
-        // Subscribe to control responses first (firmware info, acks)
-        try {
-          await control.startNotifications();
-          control.addEventListener("characteristicvaluechanged", (event: Event) => {
+      // Helper: attach a data listener to a characteristic
+      const attachDataListener = (characteristic: BluetoothRemoteGATTCharacteristic, processorCh: number) => {
+        characteristic.addEventListener(
+          "characteristicvaluechanged",
+          (event: Event) => {
             const target = event.target as BluetoothRemoteGATTCharacteristic;
             if (target.value) {
-              const bytes = new Uint8Array(target.value.buffer);
-              // Control responses are length-prefixed ASCII
-              const text = new TextDecoder().decode(bytes.slice(1));
-              console.info(`[Muse] Control response (${bytes.length}b): ${text.trim()}`);
+              if (packetLogCount < 10) {
+                const bytes = new Uint8Array(target.value.buffer);
+                console.debug(
+                  `[Muse] Packet ch${processorCh}: ${bytes.length}B header=[${bytes[0]},${bytes[1]}] from ${characteristic.uuid.substring(0, 8)}`
+                );
+                packetLogCount++;
+              }
+              const samples = parseEEGSamples(target.value);
+              this.processor.addSamples(processorCh, samples);
             }
-          });
-        } catch { /* notify not supported on control in some firmware */ }
+          }
+        );
+      };
 
-        // Halt any stale stream
-        await writeCmd(CMD.HALT);
-        await this.delay(300);
-        // Request version (validates the connection is alive)
-        await writeCmd(CMD.VERSION);
-        await this.delay(500);
-        // Start streaming: try Athena preset first, then EEG-only, then legacy
-        await writeCmd(CMD.PRESET_DEFAULT); // p21
-        await this.delay(500);
-        console.info("[Muse] Init sequence complete: h → v1 → p21");
-      } catch (ctrlErr) {
-        console.warn("[Muse] Control init failed:", ctrlErr);
-        // Fallback: try legacy command with writeValueWithoutResponse
-        try {
-          const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
-          await control.writeValueWithoutResponse(encodeMuseCommand(CMD.PRESET_LEGACY));
-          console.info("[Muse] Sent legacy 'p' command (fallback)");
-        } catch (legacyErr) {
-          console.warn("[Muse] Legacy start also failed:", legacyErr);
-        }
+      // Subscribe to control channel for responses
+      let controlChar: BluetoothRemoteGATTCharacteristic | null = null;
+      try {
+        controlChar = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
+        await controlChar.startNotifications();
+        controlChar.addEventListener("characteristicvaluechanged", (event: Event) => {
+          const target = event.target as BluetoothRemoteGATTCharacteristic;
+          if (target.value) {
+            const bytes = new Uint8Array(target.value.buffer);
+            const text = new TextDecoder().decode(bytes.slice(1));
+            console.info(`[Muse] Control response (${bytes.length}b): ${text.trim()}`);
+          }
+        });
+        console.info("[Muse] ✓ Control channel subscribed for responses");
+      } catch {
+        console.warn("[Muse] Could not subscribe to control responses");
       }
 
-      // ── Step 3: Subscribe to EEG channels ───────────────────────────
-      // Try known UUIDs first, then fall back to auto-discovery from enumerated characteristics
-      let subscribedChannels = 0;
-
-      // Build the list of UUIDs to try: known EEG channels + extras
-      const knownUUIDs = Object.entries(EEG_CHARACTERISTICS);
-      for (const [channelStr, uuid] of knownUUIDs) {
+      // Try known EEG UUIDs first (classic Muse 2)
+      for (const [channelStr, uuid] of Object.entries(EEG_CHARACTERISTICS)) {
         const channel = parseInt(channelStr);
         try {
-          const characteristic = await service.getCharacteristic(uuid);
-          await characteristic.startNotifications();
-          console.info(`[Muse] ✓ Subscribed to EEG ch${channel} (${ELECTRODES[channel]}): ${uuid}`);
-          characteristic.addEventListener(
-            "characteristicvaluechanged",
-            (event: Event) => {
-              const target = event.target as BluetoothRemoteGATTCharacteristic;
-              if (target.value) {
-                const samples = parseEEGSamples(target.value);
-                this.processor.addSamples(channel, samples);
-              }
-            }
-          );
+          const c = await service.getCharacteristic(uuid);
+          await c.startNotifications();
+          attachDataListener(c, channel);
+          console.info(`[Muse] ✓ Subscribed EEG ch${channel} (${ELECTRODES[channel]}): ${uuid}`);
           subscribedChannels++;
-        } catch (err) {
-          console.warn(`[Muse] ✗ Could not subscribe to EEG ch${channel} (${uuid}):`, err);
+        } catch {
+          // Expected to fail on Athena firmware — will auto-discover below
         }
       }
 
-      // ── Step 4: Auto-discovery fallback ─────────────────────────────
-      // If known UUIDs failed (Muse S Athena firmware), try subscribing
-      // to any notify-capable characteristic and map them to processor
-      // channels 1 and 2 (AF7, AF8) so the frontal asymmetry ready-check
-      // passes. The Athena uses 273e0013/0014 instead of 273e0003-0006.
+      // Auto-discovery for Athena firmware (273e0013/0014 instead of 0003-0006)
       if (subscribedChannels === 0 && allCharacteristics.length > 0) {
-        console.info("[Muse] Known UUIDs failed — trying auto-discovery (Athena firmware detected)");
-        // Map discovered channels to processor channels 1,2,0,3 so that
-        // the first two channels become AF7 (1) and AF8 (2) — the minimum
-        // needed for the frontal alpha asymmetry calculation.
-        const channelMapping = [1, 2, 0, 3]; // AF7, AF8, TP9, TP10
+        console.info("[Muse] Classic UUIDs not found — Athena firmware detected, auto-discovering channels");
+        const channelMapping = [1, 2, 0, 3]; // First two → AF7, AF8 for FAA
         let autoIdx = 0;
-        let packetLogCount = 0;
         for (const c of allCharacteristics) {
           if (c.uuid === CONTROL_CHARACTERISTIC) continue;
           if (!c.properties.notify) continue;
           try {
             await c.startNotifications();
             const processorCh = channelMapping[Math.min(autoIdx, 3)];
-            const uuid = c.uuid;
-            console.info(`[Muse] ✓ Auto-subscribed ${uuid} → processor ch${processorCh} (${ELECTRODES[processorCh] ?? "AUX"})`);
-            c.addEventListener(
-              "characteristicvaluechanged",
-              (event: Event) => {
-                const target = event.target as BluetoothRemoteGATTCharacteristic;
-                if (target.value) {
-                  // Log first few packets for calibration diagnostics
-                  if (packetLogCount < 5) {
-                    const bytes = new Uint8Array(target.value.buffer);
-                    console.debug(
-                      `[Muse] Packet from ${uuid}: ${bytes.length} bytes, header=[${bytes[0]},${bytes[1]}]`
-                    );
-                    packetLogCount++;
-                  }
-                  const samples = parseEEGSamples(target.value);
-                  this.processor.addSamples(processorCh, samples);
-                }
-              }
-            );
+            attachDataListener(c, processorCh);
+            console.info(`[Muse] ✓ Auto-subscribed ${c.uuid} → ch${processorCh} (${ELECTRODES[processorCh] ?? "AUX"})`);
             subscribedChannels++;
             autoIdx++;
-          } catch (autoErr) {
-            console.warn(`[Muse] ✗ Auto-subscribe failed for ${c.uuid}:`, autoErr);
+          } catch (err) {
+            console.warn(`[Muse] ✗ Auto-subscribe failed for ${c.uuid}:`, err);
           }
         }
       }
 
       if (subscribedChannels === 0) {
-        // Log detailed diagnostic info for troubleshooting
-        console.error("[Muse] FAILED — no EEG channels could be subscribed.");
-        console.error("[Muse] Characteristics found:", allCharacteristics.map(c => c.uuid));
         throw new Error(
-          `Failed to subscribe to any EEG channels (${allCharacteristics.length} characteristics found). ` +
-          "Try: turn Muse off → close all browser windows → reopen → turn Muse on → connect."
+          `No EEG channels available (${allCharacteristics.length} characteristics found). ` +
+          "Turn Muse off, close all browser windows, reopen, and try again."
         );
       }
-      console.info(`[Muse] ✓ ${subscribedChannels} EEG channel(s) active`);
+      console.info(`[Muse] ✓ ${subscribedChannels} data channel(s) subscribed — now sending start command`);
+
+      // ── Step 3: Send start command AFTER subscriptions are active ───
+      // The Muse will now stream data to the characteristics we just subscribed to.
+      const writeCmd = async (cmd: string) => {
+        if (!controlChar) return;
+        const packet = encodeMuseCommand(cmd);
+        console.info(`[Muse] Sending '${cmd}': [${Array.from(packet).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+        await controlChar.writeValueWithoutResponse(packet);
+      };
+
+      try {
+        // Halt any stale stream
+        await writeCmd(CMD.HALT);
+        await this.delay(300);
+        // Request version info
+        await writeCmd(CMD.VERSION);
+        await this.delay(500);
+        // Try presets in order: p21 (Athena EEG+accel), p20 (EEG only), p (legacy)
+        for (const preset of [CMD.PRESET_DEFAULT, CMD.PRESET_EEG, CMD.PRESET_LEGACY]) {
+          await writeCmd(preset);
+          await this.delay(500);
+          // Check if data started arriving
+          if (packetLogCount > 0) {
+            console.info(`[Muse] ✓ Data streaming started with preset '${preset}'`);
+            break;
+          }
+          console.info(`[Muse] Preset '${preset}' — no data yet, trying next...`);
+        }
+        if (packetLogCount === 0) {
+          console.warn("[Muse] No data packets received after all presets — device may need a restart");
+        }
+      } catch (err) {
+        console.warn("[Muse] Start command failed:", err);
+      }
 
       // Start computing metrics every 500ms
       this.metricsInterval = setInterval(() => {
