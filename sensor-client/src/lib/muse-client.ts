@@ -313,37 +313,33 @@ export class MuseClient {
       console.info(`[Muse] ✓ ${subscribedChannels} data channel(s) subscribed — now sending start command`);
 
       // ── Step 3: Send start command AFTER subscriptions are active ───
-      // The Muse will now stream data to the characteristics we just subscribed to.
-      const writeCmd = async (cmd: string) => {
-        if (!controlChar) return;
-        const packet = encodeMuseCommand(cmd);
-        console.info(`[Muse] Sending '${cmd}': [${Array.from(packet).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
-        await controlChar.writeValueWithoutResponse(packet);
-      };
+      // Fire commands rapidly — no awaiting responses between them.
+      // Web Bluetooth can deadlock if a notification arrives between writes.
+      if (controlChar) {
+        const fire = (cmd: string) => {
+          const packet = encodeMuseCommand(cmd);
+          console.info(`[Muse] Sending '${cmd}'`);
+          // Fire-and-forget: don't await, queue them all at once
+          controlChar!.writeValueWithoutResponse(packet).catch(
+            (e: unknown) => console.warn(`[Muse] Command '${cmd}' failed:`, e)
+          );
+        };
 
-      try {
-        // Halt any stale stream
-        await writeCmd(CMD.HALT);
-        await this.delay(300);
-        // Request version info
-        await writeCmd(CMD.VERSION);
-        await this.delay(500);
-        // Try presets in order: p21 (Athena EEG+accel), p20 (EEG only), p (legacy)
-        for (const preset of [CMD.PRESET_DEFAULT, CMD.PRESET_EEG, CMD.PRESET_LEGACY]) {
-          await writeCmd(preset);
-          await this.delay(500);
-          // Check if data started arriving
-          if (packetLogCount > 0) {
-            console.info(`[Muse] ✓ Data streaming started with preset '${preset}'`);
-            break;
-          }
-          console.info(`[Muse] Preset '${preset}' — no data yet, trying next...`);
-        }
-        if (packetLogCount === 0) {
-          console.warn("[Muse] No data packets received after all presets — device may need a restart");
-        }
-      } catch (err) {
-        console.warn("[Muse] Start command failed:", err);
+        // Halt stale stream, then start with multiple preset attempts
+        fire(CMD.HALT);
+        await this.delay(400);
+        fire(CMD.PRESET_DEFAULT); // p21 — Athena EEG+accel
+        await this.delay(400);
+        // If p21 didn't work, try others
+        fire(CMD.PRESET_EEG);     // p20 — EEG only
+        await this.delay(400);
+        fire(CMD.PRESET_LEGACY);  // p — classic start
+        await this.delay(400);
+        fire(CMD.VERSION);        // v1 — triggers a response to confirm comms
+
+        // Wait a bit for data to start flowing
+        await this.delay(1000);
+        console.info(`[Muse] Start commands sent — packets received so far: ${packetLogCount}`);
       }
 
       // Start computing metrics every 500ms
