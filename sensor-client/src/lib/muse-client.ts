@@ -218,7 +218,11 @@ export class MuseClient {
       }
 
       if (subscribedChannels === 0) {
-        throw new Error("Failed to subscribe to any EEG channels");
+        throw new Error(
+          "Failed to subscribe to any EEG channels. " +
+          "If the device shows as 'Paired' in the Bluetooth picker, " +
+          "go to Windows Settings → Bluetooth & devices → remove the Muse, then try again."
+        );
       }
       console.info(`[Muse] Subscribed to ${subscribedChannels}/4 EEG channels`);
 
