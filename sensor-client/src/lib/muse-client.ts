@@ -276,30 +276,46 @@ export class MuseClient {
       }
 
       // ── Step 4: Auto-discovery fallback ─────────────────────────────
-      // If known UUIDs failed, try subscribing to any notify-capable
-      // characteristic we discovered (excluding the control channel)
+      // If known UUIDs failed (Muse S Athena firmware), try subscribing
+      // to any notify-capable characteristic and map them to processor
+      // channels 1 and 2 (AF7, AF8) so the frontal asymmetry ready-check
+      // passes. The Athena uses 273e0013/0014 instead of 273e0003-0006.
       if (subscribedChannels === 0 && allCharacteristics.length > 0) {
-        console.info("[Muse] Known UUIDs failed — trying auto-discovery on all notify-capable characteristics");
-        let autoChannel = 0;
+        console.info("[Muse] Known UUIDs failed — trying auto-discovery (Athena firmware detected)");
+        // Map discovered channels to processor channels 1,2,0,3 so that
+        // the first two channels become AF7 (1) and AF8 (2) — the minimum
+        // needed for the frontal alpha asymmetry calculation.
+        const channelMapping = [1, 2, 0, 3]; // AF7, AF8, TP9, TP10
+        let autoIdx = 0;
+        let packetLogCount = 0;
         for (const c of allCharacteristics) {
           if (c.uuid === CONTROL_CHARACTERISTIC) continue;
           if (!c.properties.notify) continue;
           try {
             await c.startNotifications();
-            const ch = autoChannel;
-            console.info(`[Muse] ✓ Auto-subscribed ch${ch}: ${c.uuid}`);
+            const processorCh = channelMapping[Math.min(autoIdx, 3)];
+            const uuid = c.uuid;
+            console.info(`[Muse] ✓ Auto-subscribed ${uuid} → processor ch${processorCh} (${ELECTRODES[processorCh] ?? "AUX"})`);
             c.addEventListener(
               "characteristicvaluechanged",
               (event: Event) => {
                 const target = event.target as BluetoothRemoteGATTCharacteristic;
                 if (target.value) {
+                  // Log first few packets for calibration diagnostics
+                  if (packetLogCount < 5) {
+                    const bytes = new Uint8Array(target.value.buffer);
+                    console.debug(
+                      `[Muse] Packet from ${uuid}: ${bytes.length} bytes, header=[${bytes[0]},${bytes[1]}]`
+                    );
+                    packetLogCount++;
+                  }
                   const samples = parseEEGSamples(target.value);
-                  this.processor.addSamples(Math.min(ch, 3), samples);
+                  this.processor.addSamples(processorCh, samples);
                 }
               }
             );
             subscribedChannels++;
-            autoChannel++;
+            autoIdx++;
           } catch (autoErr) {
             console.warn(`[Muse] ✗ Auto-subscribe failed for ${c.uuid}:`, autoErr);
           }
