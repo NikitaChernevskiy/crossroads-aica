@@ -15,14 +15,26 @@ import { EEGProcessor, ELECTRODES, type EmotionalMetrics, type CalibratedSample 
 
 // Muse BLE UUIDs
 const MUSE_SERVICE = 0xfe8d;
-// EEG channel characteristics (Muse 2 / Muse S)
+const MUSE_UUID_BASE = "4c4d-454d-96be-f03bac821358";
+
+// Known EEG channel characteristics — same UUIDs across Muse 2 / Muse S / Athena
 const EEG_CHARACTERISTICS: Record<number, string> = {
-  0: "273e0003-4c4d-454d-96be-f03bac821358", // TP9
-  1: "273e0004-4c4d-454d-96be-f03bac821358", // AF7
-  2: "273e0005-4c4d-454d-96be-f03bac821358", // AF8
-  3: "273e0006-4c4d-454d-96be-f03bac821358", // TP10
+  0: `273e0003-${MUSE_UUID_BASE}`, // TP9
+  1: `273e0004-${MUSE_UUID_BASE}`, // AF7
+  2: `273e0005-${MUSE_UUID_BASE}`, // AF8
+  3: `273e0006-${MUSE_UUID_BASE}`, // TP10
 };
-const CONTROL_CHARACTERISTIC = "273e0001-4c4d-454d-96be-f03bac821358";
+const CONTROL_CHARACTERISTIC = `273e0001-${MUSE_UUID_BASE}`;
+
+// Muse control commands
+const CMD = {
+  HALT: "h",           // stop streaming
+  VERSION: "v1",       // request version/firmware info
+  PRESET_DEFAULT: "p21", // preset 21: EEG + accelerometer (works on Muse S Athena)
+  PRESET_EEG: "p20",    // preset 20: EEG only
+  PRESET_LEGACY: "p",   // legacy start command (Muse 2 classic)
+  KEEP_ALIVE: "k",     // keep-alive signal
+};
 
 export type MuseConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -179,28 +191,74 @@ export class MuseClient {
         service = await this.server.getPrimaryService(MUSE_SERVICE);
       }
 
-      // Send halt then start command — resets the Muse's streaming state
+      // ── Step 1: Discover all characteristics in the service ──────────
+      let allCharacteristics: BluetoothRemoteGATTCharacteristic[] = [];
       try {
-        const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
-        const encoder = new TextEncoder();
-        // Send "h" (halt) first to reset any stale stream, then "p" (start)
-        await control.writeValue(encoder.encode("h"));
-        await this.delay(100);
-        await control.writeValue(encoder.encode("p"));
-        console.info("[Muse] Sent h→p stream control commands");
-      } catch {
-        // Some Muse firmware versions don't need the start command
-        console.warn("[Muse] Could not send stream commands — continuing anyway");
+        allCharacteristics = await service.getCharacteristics();
+        console.info(`[Muse] Service has ${allCharacteristics.length} characteristics:`);
+        for (const c of allCharacteristics) {
+          console.info(`  [Muse]   ${c.uuid}  props: ${JSON.stringify({
+            read: c.properties.read,
+            write: c.properties.write,
+            writeWithoutResponse: c.properties.writeWithoutResponse,
+            notify: c.properties.notify,
+            indicate: c.properties.indicate,
+          })}`);
+        }
+      } catch (discErr) {
+        console.warn("[Muse] Could not enumerate characteristics:", discErr);
       }
 
-      // Subscribe to EEG channels
+      // ── Step 2: Initialize control channel (halt → preset) ──────────
+      const encoder = new TextEncoder();
+      try {
+        const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
+        // Subscribe to control responses first
+        try {
+          await control.startNotifications();
+          control.addEventListener("characteristicvaluechanged", (event: Event) => {
+            const target = event.target as BluetoothRemoteGATTCharacteristic;
+            if (target.value) {
+              const decoder = new TextDecoder();
+              const resp = decoder.decode(target.value);
+              console.info(`[Muse] Control response: ${resp}`);
+            }
+          });
+        } catch { /* notify not supported on control in some firmware */ }
+
+        // Halt any stale stream
+        await control.writeValue(encoder.encode(CMD.HALT));
+        await this.delay(200);
+        // Request version (validates the connection is alive)
+        await control.writeValue(encoder.encode(CMD.VERSION));
+        await this.delay(200);
+        // Start streaming with Athena-compatible preset
+        await control.writeValue(encoder.encode(CMD.PRESET_DEFAULT));
+        await this.delay(300);
+        console.info("[Muse] Sent init sequence: halt → version → p21");
+      } catch (ctrlErr) {
+        console.warn("[Muse] Control init failed, trying legacy start:", ctrlErr);
+        try {
+          const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
+          await control.writeValue(encoder.encode(CMD.PRESET_LEGACY));
+          console.info("[Muse] Sent legacy 'p' command");
+        } catch {
+          console.warn("[Muse] Legacy start also failed — continuing without start command");
+        }
+      }
+
+      // ── Step 3: Subscribe to EEG channels ───────────────────────────
+      // Try known UUIDs first, then fall back to auto-discovery from enumerated characteristics
       let subscribedChannels = 0;
-      for (const [channelStr, uuid] of Object.entries(EEG_CHARACTERISTICS)) {
+
+      // Build the list of UUIDs to try: known EEG channels + extras
+      const knownUUIDs = Object.entries(EEG_CHARACTERISTICS);
+      for (const [channelStr, uuid] of knownUUIDs) {
         const channel = parseInt(channelStr);
         try {
           const characteristic = await service.getCharacteristic(uuid);
           await characteristic.startNotifications();
-          console.info(`[Muse] Subscribed to EEG channel ${channel} (${ELECTRODES[channel]})`);
+          console.info(`[Muse] ✓ Subscribed to EEG ch${channel} (${ELECTRODES[channel]}): ${uuid}`);
           characteristic.addEventListener(
             "characteristicvaluechanged",
             (event: Event) => {
@@ -213,18 +271,51 @@ export class MuseClient {
           );
           subscribedChannels++;
         } catch (err) {
-          console.warn(`[Muse] Could not subscribe to EEG channel ${channel}:`, err);
+          console.warn(`[Muse] ✗ Could not subscribe to EEG ch${channel} (${uuid}):`, err);
+        }
+      }
+
+      // ── Step 4: Auto-discovery fallback ─────────────────────────────
+      // If known UUIDs failed, try subscribing to any notify-capable
+      // characteristic we discovered (excluding the control channel)
+      if (subscribedChannels === 0 && allCharacteristics.length > 0) {
+        console.info("[Muse] Known UUIDs failed — trying auto-discovery on all notify-capable characteristics");
+        let autoChannel = 0;
+        for (const c of allCharacteristics) {
+          if (c.uuid === CONTROL_CHARACTERISTIC) continue;
+          if (!c.properties.notify) continue;
+          try {
+            await c.startNotifications();
+            const ch = autoChannel;
+            console.info(`[Muse] ✓ Auto-subscribed ch${ch}: ${c.uuid}`);
+            c.addEventListener(
+              "characteristicvaluechanged",
+              (event: Event) => {
+                const target = event.target as BluetoothRemoteGATTCharacteristic;
+                if (target.value) {
+                  const samples = parseEEGSamples(target.value);
+                  this.processor.addSamples(Math.min(ch, 3), samples);
+                }
+              }
+            );
+            subscribedChannels++;
+            autoChannel++;
+          } catch (autoErr) {
+            console.warn(`[Muse] ✗ Auto-subscribe failed for ${c.uuid}:`, autoErr);
+          }
         }
       }
 
       if (subscribedChannels === 0) {
+        // Log detailed diagnostic info for troubleshooting
+        console.error("[Muse] FAILED — no EEG channels could be subscribed.");
+        console.error("[Muse] Characteristics found:", allCharacteristics.map(c => c.uuid));
         throw new Error(
-          "Failed to subscribe to any EEG channels. " +
-          "If the device shows as 'Paired' in the Bluetooth picker, " +
-          "go to Windows Settings → Bluetooth & devices → remove the Muse, then try again."
+          `Failed to subscribe to any EEG channels (${allCharacteristics.length} characteristics found). ` +
+          "Try: turn Muse off → close all browser windows → reopen → turn Muse on → connect."
         );
       }
-      console.info(`[Muse] Subscribed to ${subscribedChannels}/4 EEG channels`);
+      console.info(`[Muse] ✓ ${subscribedChannels} EEG channel(s) active`);
 
       // Start computing metrics every 500ms
       this.metricsInterval = setInterval(() => {
