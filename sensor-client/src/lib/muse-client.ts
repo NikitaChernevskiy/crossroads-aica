@@ -241,13 +241,16 @@ export class MuseClient {
           (event: Event) => {
             const target = event.target as BluetoothRemoteGATTCharacteristic;
             if (target.value) {
+              if (packetLogCount === 0) {
+                console.warn("[Muse] ★ First EEG packet received — streaming is active!");
+              }
               if (packetLogCount < 10) {
                 const bytes = new Uint8Array(target.value.buffer);
-                console.debug(
+                console.warn(
                   `[Muse] Packet ch${processorCh}: ${bytes.length}B header=[${bytes[0]},${bytes[1]}] from ${characteristic.uuid.substring(0, 8)}`
                 );
-                packetLogCount++;
               }
+              packetLogCount++;
               const samples = parseEEGSamples(target.value);
               this.processor.addSamples(processorCh, samples);
             }
@@ -325,39 +328,88 @@ export class MuseClient {
         const sendCmd = (cmd: string) => {
           try {
             const pkt = encodeMuseCommand(cmd);
-            console.info(`[Muse] Sending '${cmd}'`);
-            ctrl.writeValueWithoutResponse(pkt).catch(() => {});
+            console.warn(`[Muse] >> Sending '${cmd}'`);
+            ctrl.writeValueWithoutResponse(pkt).then(
+              () => console.warn(`[Muse] << '${cmd}' write OK`),
+              (err: unknown) => console.error(`[Muse] !! '${cmd}' write REJECTED:`, err)
+            );
           } catch (e) {
-            console.warn(`[Muse] Send '${cmd}' error:`, e);
+            console.error(`[Muse] !! '${cmd}' sync error:`, e);
           }
         };
 
-        // Queue commands with plain setTimeout — no async/await
-        sendCmd(CMD.HALT);
         if (isAthena) {
-          // Athena firmware needs its own presets (p50/p51) + explicit resume (d)
-          setTimeout(() => sendCmd(CMD.PRESET_ATHENA_EEG), 500);  // p51
-          setTimeout(() => sendCmd(CMD.PRESET_ATHENA_STD), 1000); // p50 fallback
-          setTimeout(() => sendCmd(CMD.RESUME), 1500);            // d — start streaming
-          setTimeout(() => sendCmd(CMD.VERSION), 2000);           // v1
+          // Athena firmware: progressively try different preset+start combos.
+          // Different Athena firmware versions respond to different presets.
+          // We check packetLogCount between attempts and stop once data flows.
+
+          // Round 1: just resume (device may already have a preset configured)
+          console.warn("[Muse] Athena round 1: halt → resume");
+          sendCmd(CMD.HALT);
+          setTimeout(() => sendCmd(CMD.RESUME), 800);
+
+          // Round 2: Athena EEG preset + resume
           setTimeout(() => {
-            console.info(`[Muse] All Athena start commands sent — packets received: ${packetLogCount}`);
-            if (packetLogCount === 0) {
-              console.warn("[Muse] No packets yet — trying legacy presets as fallback");
-              sendCmd(CMD.PRESET_DEFAULT);  // p21
-              setTimeout(() => sendCmd(CMD.PRESET_EEG), 500);  // p20
-              setTimeout(() => sendCmd(CMD.RESUME), 1000);     // d
-            }
+            if (packetLogCount > 0) return;
+            console.warn("[Muse] Athena round 2: p51 (EEG) → resume");
+            sendCmd(CMD.PRESET_ATHENA_EEG);
+            setTimeout(() => sendCmd(CMD.RESUME), 800);
           }, 3000);
+
+          // Round 3: Athena standard preset + resume
+          setTimeout(() => {
+            if (packetLogCount > 0) return;
+            console.warn("[Muse] Athena round 3: p50 (std) → resume");
+            sendCmd(CMD.PRESET_ATHENA_STD);
+            setTimeout(() => sendCmd(CMD.RESUME), 800);
+          }, 6000);
+
+          // Round 4: legacy Muse 2 presets (some Athena FW accepts these)
+          setTimeout(() => {
+            if (packetLogCount > 0) return;
+            console.warn("[Muse] Athena round 4: p21 → p20 → resume");
+            sendCmd(CMD.PRESET_DEFAULT);
+            setTimeout(() => sendCmd(CMD.PRESET_EEG), 800);
+            setTimeout(() => sendCmd(CMD.RESUME), 1600);
+          }, 9000);
+
+          // Round 5: legacy 'p' start + 's' command (last resort)
+          setTimeout(() => {
+            if (packetLogCount > 0) return;
+            console.warn("[Muse] Athena round 5: legacy 'p' + 's' start");
+            sendCmd(CMD.PRESET_LEGACY);
+            setTimeout(() => {
+              try {
+                const pkt = encodeMuseCommand("s");
+                console.warn("[Muse] >> Sending 's' (start)");
+                ctrl.writeValueWithoutResponse(pkt).then(
+                  () => console.warn("[Muse] << 's' write OK"),
+                  (err: unknown) => console.error("[Muse] !! 's' write REJECTED:", err)
+                );
+              } catch (e) {
+                console.error("[Muse] !! 's' sync error:", e);
+              }
+            }, 800);
+          }, 13000);
+
+          // Final status
+          setTimeout(() => {
+            sendCmd(CMD.VERSION);
+            console.warn(`[Muse] Start sequence complete — total packets: ${packetLogCount}`);
+            if (packetLogCount === 0) {
+              console.error("[Muse] ✗ No EEG data after trying all presets. Try: power-cycle Muse, close ALL other BLE apps, reload page.");
+            }
+          }, 16000);
         } else {
           // Classic Muse 2 sequence
+          sendCmd(CMD.HALT);
           setTimeout(() => sendCmd(CMD.PRESET_DEFAULT), 500);   // p21
           setTimeout(() => sendCmd(CMD.PRESET_EEG), 1000);      // p20
           setTimeout(() => sendCmd(CMD.PRESET_LEGACY), 1500);   // p
-          setTimeout(() => sendCmd(CMD.RESUME), 2000);           // d — in case needed
+          setTimeout(() => sendCmd(CMD.RESUME), 2000);           // d
           setTimeout(() => sendCmd(CMD.VERSION), 2500);          // v1
           setTimeout(() => {
-            console.info(`[Muse] All start commands sent — packets received: ${packetLogCount}`);
+            console.warn(`[Muse] All start commands sent — packets received: ${packetLogCount}`);
           }, 3500);
         }
       }
