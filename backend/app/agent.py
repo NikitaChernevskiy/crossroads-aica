@@ -16,12 +16,14 @@ from typing import Optional
 from azure.ai.agents import AgentsClient
 from azure.ai.agents.models import FunctionTool, ToolSet
 from azure.identity import DefaultAzureCredential
+from opentelemetry import trace
 
 from app.config import settings
 from app.cosmos import StateStore
 from app.rules import BehaviorRulesEngine
 
 logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__, "0.1.0")
 
 AGENT_INSTRUCTIONS = """\
 You are an empathetic AI assistant powered by the AI Emotional Partner system.
@@ -83,31 +85,44 @@ def get_behavior_guidance(user_id: str) -> str:
     if _store is None or _engine is None:
         return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
                            "instructions": ["Respond normally — system not ready"]})
-    try:
-        # Schedule the async Cosmos query on the MAIN event loop (where the
-        # async CosmosClient was created).  Using asyncio.run() in a worker
-        # thread would create a NEW event loop, and the Cosmos aiohttp session
-        # is bound to the original loop — causing silent failures.
-        if _main_loop is None or _main_loop.is_closed():
-            raise RuntimeError("Main event loop not available")
-        future = asyncio.run_coroutine_threadsafe(
-            _store.get_current_state(user_id), _main_loop
-        )
-        state = future.result(timeout=10)
 
-        guidance = _engine.evaluate(state)
-        _last_guidance_ok = guidance.fresh
-        _last_state_label = guidance.state if guidance.fresh else None
-        logger.info(
-            "[GUIDANCE] user=%s state=%s fresh=%s age=%ds instructions=%s",
-            user_id, guidance.state, guidance.fresh, guidance.age_sec,
-            guidance.instructions[:1],  # first instruction as preview
-        )
-        return json.dumps(guidance.model_dump())
-    except Exception as e:
-        logger.warning("get_behavior_guidance FAILED for %s: %s", user_id, e, exc_info=True)
-        return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
-                           "instructions": ["Respond warmly and naturally — sensor data temporarily unavailable"]})
+    with tracer.start_as_current_span(
+        "get_behavior_guidance",
+        attributes={"user_id": user_id, "component": "foundry_function_tool"},
+    ) as span:
+        try:
+            # Schedule the async Cosmos query on the MAIN event loop (where the
+            # async CosmosClient was created).  Using asyncio.run() in a worker
+            # thread would create a NEW event loop, and the Cosmos aiohttp session
+            # is bound to the original loop — causing silent failures.
+            if _main_loop is None or _main_loop.is_closed():
+                raise RuntimeError("Main event loop not available")
+            future = asyncio.run_coroutine_threadsafe(
+                _store.get_current_state(user_id), _main_loop
+            )
+            state = future.result(timeout=10)
+
+            guidance = _engine.evaluate(state)
+            _last_guidance_ok = guidance.fresh
+            _last_state_label = guidance.state if guidance.fresh else None
+
+            span.set_attribute("guidance.state", guidance.state)
+            span.set_attribute("guidance.fresh", guidance.fresh)
+            span.set_attribute("guidance.age_sec", guidance.age_sec)
+            span.set_status(trace.StatusCode.OK)
+
+            logger.info(
+                "[GUIDANCE] user=%s state=%s fresh=%s age=%ds instructions=%s",
+                user_id, guidance.state, guidance.fresh, guidance.age_sec,
+                guidance.instructions[:1],  # first instruction as preview
+            )
+            return json.dumps(guidance.model_dump())
+        except Exception as e:
+            span.set_status(trace.StatusCode.ERROR, str(e))
+            span.record_exception(e)
+            logger.warning("get_behavior_guidance FAILED for %s: %s", user_id, e, exc_info=True)
+            return json.dumps({"state": "unknown", "fresh": False, "age_sec": -1,
+                               "instructions": ["Respond warmly and naturally — sensor data temporarily unavailable"]})
 
 
 class AgentService:
@@ -129,39 +144,48 @@ class AgentService:
 
     def initialize(self) -> None:
         """Create the AgentsClient and register the agent."""
-        cred = DefaultAzureCredential()
-        self.client = AgentsClient(
-            endpoint=settings.foundry_project_endpoint,
-            credential=cred,
-        )
+        with tracer.start_as_current_span(
+            "foundry_agent_initialize",
+            attributes={"component": "foundry_agent"},
+        ) as span:
+            cred = DefaultAzureCredential()
+            self.client = AgentsClient(
+                endpoint=settings.foundry_project_endpoint,
+                credential=cred,
+            )
 
-        # Function tool — SDK auto-invokes get_behavior_guidance during runs
-        fn_tool = FunctionTool(functions=[get_behavior_guidance])
-        toolset = ToolSet()
-        toolset.add(fn_tool)
-        self.client.enable_auto_function_calls(toolset)
+            # Function tool — SDK auto-invokes get_behavior_guidance during runs
+            fn_tool = FunctionTool(functions=[get_behavior_guidance])
+            toolset = ToolSet()
+            toolset.add(fn_tool)
+            self.client.enable_auto_function_calls(toolset)
 
-        # Reuse existing agent or create new one
-        for a in self.client.list_agents():
-            if a.name == "emotional-partner":
-                self.agent_id = a.id
-                self.client.update_agent(
-                    agent_id=a.id,
+            # Reuse existing agent or create new one
+            for a in self.client.list_agents():
+                if a.name == "emotional-partner":
+                    self.agent_id = a.id
+                    self.client.update_agent(
+                        agent_id=a.id,
+                        instructions=AGENT_INSTRUCTIONS,
+                        tools=fn_tool.definitions,
+                    )
+                    logger.info("Reusing Foundry agent %s", a.id)
+                    span.set_attribute("agent.reused", True)
+                    break
+
+            if not self.agent_id:
+                agent = self.client.create_agent(
+                    model=settings.foundry_model_deployment,
+                    name="emotional-partner",
                     instructions=AGENT_INSTRUCTIONS,
                     tools=fn_tool.definitions,
                 )
-                logger.info("Reusing Foundry agent %s", a.id)
-                break
+                self.agent_id = agent.id
+                logger.info("Created Foundry agent %s", agent.id)
+                span.set_attribute("agent.reused", False)
 
-        if not self.agent_id:
-            agent = self.client.create_agent(
-                model=settings.foundry_model_deployment,
-                name="emotional-partner",
-                instructions=AGENT_INSTRUCTIONS,
-                tools=fn_tool.definitions,
-            )
-            self.agent_id = agent.id
-            logger.info("Created Foundry agent %s", agent.id)
+            span.set_attribute("agent.id", self.agent_id or "unknown")
+            span.set_status(trace.StatusCode.OK)
 
     async def chat(
         self,
@@ -178,40 +202,55 @@ class AgentService:
             raise RuntimeError("Agent not initialized")
 
         def _sync_chat() -> tuple[str, str]:
-            # Create or reuse thread (Foundry keeps full history server-side)
-            if not thread_id:
-                thread = self.client.threads.create()  # type: ignore[union-attr]
-                tid = thread.id
-            else:
-                tid = thread_id
+            with tracer.start_as_current_span(
+                "foundry_agent_chat",
+                attributes={
+                    "user_id": user_id,
+                    "thread.reused": bool(thread_id),
+                    "component": "foundry_agent",
+                },
+            ) as span:
+                # Create or reuse thread (Foundry keeps full history server-side)
+                if not thread_id:
+                    thread = self.client.threads.create()  # type: ignore[union-attr]
+                    tid = thread.id
+                else:
+                    tid = thread_id
+                span.set_attribute("thread.id", tid)
 
-            # Add user message
-            self.client.messages.create(thread_id=tid, role="user", content=message)  # type: ignore[union-attr]
+                # Add user message
+                self.client.messages.create(thread_id=tid, role="user", content=message)  # type: ignore[union-attr]
 
-            # Run agent — auto function calls handle get_behavior_guidance
-            run = self.client.runs.create_and_process(  # type: ignore[union-attr]
-                thread_id=tid,
-                agent_id=self.agent_id,  # type: ignore[arg-type]
-                additional_instructions=f"The current user_id is: {user_id}",
-            )
+                # Run agent — auto function calls handle get_behavior_guidance
+                run = self.client.runs.create_and_process(  # type: ignore[union-attr]
+                    thread_id=tid,
+                    agent_id=self.agent_id,  # type: ignore[arg-type]
+                    additional_instructions=f"The current user_id is: {user_id}",
+                )
+                span.set_attribute("run.id", run.id)
+                span.set_attribute("run.status", run.status)
 
-            if run.status == "failed":
-                err = getattr(run, "last_error", "unknown error")
-                logger.error("Agent run failed: %s", err)
-                return tid, f"I had trouble processing that. ({err})"
+                if run.status == "failed":
+                    err = getattr(run, "last_error", "unknown error")
+                    logger.error("Agent run failed: %s", err)
+                    span.set_status(trace.StatusCode.ERROR, str(err))
+                    return tid, f"I had trouble processing that. ({err})"
 
-            # Get assistant's response (returns MessageTextContent | None)
-            # MessageTextContent.text is a MessageText with .value and .annotations
-            msg = self.client.messages.get_last_message_text_by_role(  # type: ignore[union-attr]
-                thread_id=tid, role="assistant"
-            )
-            if msg and hasattr(msg.text, "value"):
-                text = msg.text.value
-            elif msg:
-                text = str(msg.text)
-            else:
-                text = "I'm here for you."
-            return tid, text
+                # Get assistant's response (returns MessageTextContent | None)
+                # MessageTextContent.text is a MessageText with .value and .annotations
+                msg = self.client.messages.get_last_message_text_by_role(  # type: ignore[union-attr]
+                    thread_id=tid, role="assistant"
+                )
+                if msg and hasattr(msg.text, "value"):
+                    text = msg.text.value
+                elif msg:
+                    text = str(msg.text)
+                else:
+                    text = "I'm here for you."
+
+                span.set_attribute("response.length", len(text))
+                span.set_status(trace.StatusCode.OK)
+                return tid, text
 
         result_tid, response_text = await asyncio.to_thread(_sync_chat)
 
