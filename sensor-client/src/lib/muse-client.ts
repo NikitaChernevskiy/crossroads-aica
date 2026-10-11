@@ -30,9 +30,12 @@ const CONTROL_CHARACTERISTIC = `273e0001-${MUSE_UUID_BASE}`;
 const CMD = {
   HALT: "h",           // stop streaming
   VERSION: "v1",       // request version/firmware info
-  PRESET_DEFAULT: "p21", // preset 21: EEG + accelerometer (works on Muse S Athena)
-  PRESET_EEG: "p20",    // preset 20: EEG only
+  PRESET_DEFAULT: "p21", // preset 21: EEG + accelerometer (Muse 2)
+  PRESET_EEG: "p20",    // preset 20: EEG only (Muse 2)
   PRESET_LEGACY: "p",   // legacy start command (Muse 2 classic)
+  PRESET_ATHENA_STD: "p50",  // preset 50: Athena standard (EEG+motion+PPG)
+  PRESET_ATHENA_EEG: "p51",  // preset 51: Athena EEG only
+  RESUME: "d",          // resume/start data streaming (required on Athena)
   KEEP_ALIVE: "k",     // keep-alive signal
 };
 
@@ -229,6 +232,7 @@ export class MuseClient {
       // start command. This is the standard BLE notification pattern.
       let subscribedChannels = 0;
       let packetLogCount = 0;
+      let isAthena = false;
 
       // Helper: attach a data listener to a characteristic
       const attachDataListener = (characteristic: BluetoothRemoteGATTCharacteristic, processorCh: number) => {
@@ -285,6 +289,7 @@ export class MuseClient {
 
       // Auto-discovery for Athena firmware (273e0013/0014 instead of 0003-0006)
       if (subscribedChannels === 0 && allCharacteristics.length > 0) {
+        isAthena = true;
         console.info("[Muse] Classic UUIDs not found — Athena firmware detected, auto-discovering channels");
         const channelMapping = [1, 2, 0, 3]; // First two → AF7, AF8 for FAA
         let autoIdx = 0;
@@ -329,13 +334,32 @@ export class MuseClient {
 
         // Queue commands with plain setTimeout — no async/await
         sendCmd(CMD.HALT);
-        setTimeout(() => sendCmd(CMD.PRESET_DEFAULT), 500);  // p21
-        setTimeout(() => sendCmd(CMD.PRESET_EEG), 1000);     // p20
-        setTimeout(() => sendCmd(CMD.PRESET_LEGACY), 1500);  // p
-        setTimeout(() => sendCmd(CMD.VERSION), 2000);         // v1
-        setTimeout(() => {
-          console.info(`[Muse] All start commands sent — packets received: ${packetLogCount}`);
-        }, 3000);
+        if (isAthena) {
+          // Athena firmware needs its own presets (p50/p51) + explicit resume (d)
+          setTimeout(() => sendCmd(CMD.PRESET_ATHENA_EEG), 500);  // p51
+          setTimeout(() => sendCmd(CMD.PRESET_ATHENA_STD), 1000); // p50 fallback
+          setTimeout(() => sendCmd(CMD.RESUME), 1500);            // d — start streaming
+          setTimeout(() => sendCmd(CMD.VERSION), 2000);           // v1
+          setTimeout(() => {
+            console.info(`[Muse] All Athena start commands sent — packets received: ${packetLogCount}`);
+            if (packetLogCount === 0) {
+              console.warn("[Muse] No packets yet — trying legacy presets as fallback");
+              sendCmd(CMD.PRESET_DEFAULT);  // p21
+              setTimeout(() => sendCmd(CMD.PRESET_EEG), 500);  // p20
+              setTimeout(() => sendCmd(CMD.RESUME), 1000);     // d
+            }
+          }, 3000);
+        } else {
+          // Classic Muse 2 sequence
+          setTimeout(() => sendCmd(CMD.PRESET_DEFAULT), 500);   // p21
+          setTimeout(() => sendCmd(CMD.PRESET_EEG), 1000);      // p20
+          setTimeout(() => sendCmd(CMD.PRESET_LEGACY), 1500);   // p
+          setTimeout(() => sendCmd(CMD.RESUME), 2000);           // d — in case needed
+          setTimeout(() => sendCmd(CMD.VERSION), 2500);          // v1
+          setTimeout(() => {
+            console.info(`[Muse] All start commands sent — packets received: ${packetLogCount}`);
+          }, 3500);
+        }
       }
 
       // Start computing metrics every 500ms
