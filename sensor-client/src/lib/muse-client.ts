@@ -313,33 +313,29 @@ export class MuseClient {
       console.info(`[Muse] ✓ ${subscribedChannels} data channel(s) subscribed — now sending start command`);
 
       // ── Step 3: Send start command AFTER subscriptions are active ───
-      // Fire commands rapidly — no awaiting responses between them.
-      // Web Bluetooth can deadlock if a notification arrives between writes.
+      // Use setTimeout chain to avoid async/await deadlocks with GATT.
+      // The BLE stack can block awaited promises when notifications arrive.
       if (controlChar) {
-        const fire = (cmd: string) => {
-          const packet = encodeMuseCommand(cmd);
-          console.info(`[Muse] Sending '${cmd}'`);
-          // Fire-and-forget: don't await, queue them all at once
-          controlChar!.writeValueWithoutResponse(packet).catch(
-            (e: unknown) => console.warn(`[Muse] Command '${cmd}' failed:`, e)
-          );
+        const ctrl = controlChar;
+        const sendCmd = (cmd: string) => {
+          try {
+            const pkt = encodeMuseCommand(cmd);
+            console.info(`[Muse] Sending '${cmd}'`);
+            ctrl.writeValueWithoutResponse(pkt).catch(() => {});
+          } catch (e) {
+            console.warn(`[Muse] Send '${cmd}' error:`, e);
+          }
         };
 
-        // Halt stale stream, then start with multiple preset attempts
-        fire(CMD.HALT);
-        await this.delay(400);
-        fire(CMD.PRESET_DEFAULT); // p21 — Athena EEG+accel
-        await this.delay(400);
-        // If p21 didn't work, try others
-        fire(CMD.PRESET_EEG);     // p20 — EEG only
-        await this.delay(400);
-        fire(CMD.PRESET_LEGACY);  // p — classic start
-        await this.delay(400);
-        fire(CMD.VERSION);        // v1 — triggers a response to confirm comms
-
-        // Wait a bit for data to start flowing
-        await this.delay(1000);
-        console.info(`[Muse] Start commands sent — packets received so far: ${packetLogCount}`);
+        // Queue commands with plain setTimeout — no async/await
+        sendCmd(CMD.HALT);
+        setTimeout(() => sendCmd(CMD.PRESET_DEFAULT), 500);  // p21
+        setTimeout(() => sendCmd(CMD.PRESET_EEG), 1000);     // p20
+        setTimeout(() => sendCmd(CMD.PRESET_LEGACY), 1500);  // p
+        setTimeout(() => sendCmd(CMD.VERSION), 2000);         // v1
+        setTimeout(() => {
+          console.info(`[Muse] All start commands sent — packets received: ${packetLogCount}`);
+        }, 3000);
       }
 
       // Start computing metrics every 500ms
