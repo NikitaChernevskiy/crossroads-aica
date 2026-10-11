@@ -36,6 +36,20 @@ const CMD = {
   KEEP_ALIVE: "k",     // keep-alive signal
 };
 
+/**
+ * Encode a Muse control command in the proper BLE packet format.
+ * Format: [total_length, ...command_ascii_bytes, 0x0a (newline)]
+ * E.g. "p21" → [0x04, 0x70, 0x32, 0x31, 0x0a]
+ */
+function encodeMuseCommand(cmd: string): Uint8Array {
+  const cmdBytes = new TextEncoder().encode(cmd);
+  const packet = new Uint8Array(cmdBytes.length + 2); // +1 for length, +1 for newline
+  packet[0] = cmdBytes.length + 1; // length = command bytes + newline
+  packet.set(cmdBytes, 1);
+  packet[packet.length - 1] = 0x0a; // newline terminator
+  return packet;
+}
+
 export type MuseConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
 export interface MuseClientCallbacks {
@@ -210,40 +224,50 @@ export class MuseClient {
       }
 
       // ── Step 2: Initialize control channel (halt → preset) ──────────
-      const encoder = new TextEncoder();
+      // The control characteristic (273e0001) only supports writeWithoutResponse,
+      // NOT write-with-response. Using writeValue() silently fails on some
+      // firmware versions. Commands use Muse's packet format: [length, ...cmd, \n]
       try {
         const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
-        // Subscribe to control responses first
+        const writeCmd = async (cmd: string) => {
+          const packet = encodeMuseCommand(cmd);
+          console.info(`[Muse] Sending command '${cmd}': [${Array.from(packet).map(b => '0x' + b.toString(16).padStart(2, '0')).join(', ')}]`);
+          await control.writeValueWithoutResponse(packet);
+        };
+
+        // Subscribe to control responses first (firmware info, acks)
         try {
           await control.startNotifications();
           control.addEventListener("characteristicvaluechanged", (event: Event) => {
             const target = event.target as BluetoothRemoteGATTCharacteristic;
             if (target.value) {
-              const decoder = new TextDecoder();
-              const resp = decoder.decode(target.value);
-              console.info(`[Muse] Control response: ${resp}`);
+              const bytes = new Uint8Array(target.value.buffer);
+              // Control responses are length-prefixed ASCII
+              const text = new TextDecoder().decode(bytes.slice(1));
+              console.info(`[Muse] Control response (${bytes.length}b): ${text.trim()}`);
             }
           });
         } catch { /* notify not supported on control in some firmware */ }
 
         // Halt any stale stream
-        await control.writeValue(encoder.encode(CMD.HALT));
-        await this.delay(200);
-        // Request version (validates the connection is alive)
-        await control.writeValue(encoder.encode(CMD.VERSION));
-        await this.delay(200);
-        // Start streaming with Athena-compatible preset
-        await control.writeValue(encoder.encode(CMD.PRESET_DEFAULT));
+        await writeCmd(CMD.HALT);
         await this.delay(300);
-        console.info("[Muse] Sent init sequence: halt → version → p21");
+        // Request version (validates the connection is alive)
+        await writeCmd(CMD.VERSION);
+        await this.delay(500);
+        // Start streaming: try Athena preset first, then EEG-only, then legacy
+        await writeCmd(CMD.PRESET_DEFAULT); // p21
+        await this.delay(500);
+        console.info("[Muse] Init sequence complete: h → v1 → p21");
       } catch (ctrlErr) {
-        console.warn("[Muse] Control init failed, trying legacy start:", ctrlErr);
+        console.warn("[Muse] Control init failed:", ctrlErr);
+        // Fallback: try legacy command with writeValueWithoutResponse
         try {
           const control = await service.getCharacteristic(CONTROL_CHARACTERISTIC);
-          await control.writeValue(encoder.encode(CMD.PRESET_LEGACY));
-          console.info("[Muse] Sent legacy 'p' command");
-        } catch {
-          console.warn("[Muse] Legacy start also failed — continuing without start command");
+          await control.writeValueWithoutResponse(encodeMuseCommand(CMD.PRESET_LEGACY));
+          console.info("[Muse] Sent legacy 'p' command (fallback)");
+        } catch (legacyErr) {
+          console.warn("[Muse] Legacy start also failed:", legacyErr);
         }
       }
 
