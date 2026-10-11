@@ -320,101 +320,13 @@ export class MuseClient {
       }
       console.info(`[Muse] ✓ ${subscribedChannels} data channel(s) subscribed — now sending start command`);
 
-      // ── Step 3: Send start command AFTER subscriptions are active ───
-      // Use setTimeout chain to avoid async/await deadlocks with GATT.
-      // The BLE stack can block awaited promises when notifications arrive.
-      if (controlChar) {
-        const ctrl = controlChar;
-        const sendCmd = (cmd: string) => {
-          try {
-            const pkt = encodeMuseCommand(cmd);
-            console.warn(`[Muse] >> Sending '${cmd}'`);
-            ctrl.writeValueWithoutResponse(pkt).then(
-              () => console.warn(`[Muse] << '${cmd}' write OK`),
-              (err: unknown) => console.error(`[Muse] !! '${cmd}' write REJECTED:`, err)
-            );
-          } catch (e) {
-            console.error(`[Muse] !! '${cmd}' sync error:`, e);
-          }
-        };
+      // ── Step 3: Send start commands AFTER subscriptions are active ───
+      // Previous setTimeout approach silently failed — timers never fired.
+      // Now using a detached async IIFE with inline await + delay() (which
+      // already works in connectGATT). Each write is protected by a 3-second
+      // Promise.race timeout to prevent GATT deadlocks.
 
-        if (isAthena) {
-          // Athena firmware: progressively try different preset+start combos.
-          // Different Athena firmware versions respond to different presets.
-          // We check packetLogCount between attempts and stop once data flows.
-
-          // Round 1: just resume (device may already have a preset configured)
-          console.warn("[Muse] Athena round 1: halt → resume");
-          sendCmd(CMD.HALT);
-          setTimeout(() => sendCmd(CMD.RESUME), 800);
-
-          // Round 2: Athena EEG preset + resume
-          setTimeout(() => {
-            if (packetLogCount > 0) return;
-            console.warn("[Muse] Athena round 2: p51 (EEG) → resume");
-            sendCmd(CMD.PRESET_ATHENA_EEG);
-            setTimeout(() => sendCmd(CMD.RESUME), 800);
-          }, 3000);
-
-          // Round 3: Athena standard preset + resume
-          setTimeout(() => {
-            if (packetLogCount > 0) return;
-            console.warn("[Muse] Athena round 3: p50 (std) → resume");
-            sendCmd(CMD.PRESET_ATHENA_STD);
-            setTimeout(() => sendCmd(CMD.RESUME), 800);
-          }, 6000);
-
-          // Round 4: legacy Muse 2 presets (some Athena FW accepts these)
-          setTimeout(() => {
-            if (packetLogCount > 0) return;
-            console.warn("[Muse] Athena round 4: p21 → p20 → resume");
-            sendCmd(CMD.PRESET_DEFAULT);
-            setTimeout(() => sendCmd(CMD.PRESET_EEG), 800);
-            setTimeout(() => sendCmd(CMD.RESUME), 1600);
-          }, 9000);
-
-          // Round 5: legacy 'p' start + 's' command (last resort)
-          setTimeout(() => {
-            if (packetLogCount > 0) return;
-            console.warn("[Muse] Athena round 5: legacy 'p' + 's' start");
-            sendCmd(CMD.PRESET_LEGACY);
-            setTimeout(() => {
-              try {
-                const pkt = encodeMuseCommand("s");
-                console.warn("[Muse] >> Sending 's' (start)");
-                ctrl.writeValueWithoutResponse(pkt).then(
-                  () => console.warn("[Muse] << 's' write OK"),
-                  (err: unknown) => console.error("[Muse] !! 's' write REJECTED:", err)
-                );
-              } catch (e) {
-                console.error("[Muse] !! 's' sync error:", e);
-              }
-            }, 800);
-          }, 13000);
-
-          // Final status
-          setTimeout(() => {
-            sendCmd(CMD.VERSION);
-            console.warn(`[Muse] Start sequence complete — total packets: ${packetLogCount}`);
-            if (packetLogCount === 0) {
-              console.error("[Muse] ✗ No EEG data after trying all presets. Try: power-cycle Muse, close ALL other BLE apps, reload page.");
-            }
-          }, 16000);
-        } else {
-          // Classic Muse 2 sequence
-          sendCmd(CMD.HALT);
-          setTimeout(() => sendCmd(CMD.PRESET_DEFAULT), 500);   // p21
-          setTimeout(() => sendCmd(CMD.PRESET_EEG), 1000);      // p20
-          setTimeout(() => sendCmd(CMD.PRESET_LEGACY), 1500);   // p
-          setTimeout(() => sendCmd(CMD.RESUME), 2000);           // d
-          setTimeout(() => sendCmd(CMD.VERSION), 2500);          // v1
-          setTimeout(() => {
-            console.warn(`[Muse] All start commands sent — packets received: ${packetLogCount}`);
-          }, 3500);
-        }
-      }
-
-      // Start computing metrics every 500ms
+      // Start computing metrics immediately so data flows as soon as streaming starts
       this.metricsInterval = setInterval(() => {
         const metrics = this.processor.compute();
         if (metrics) {
@@ -423,6 +335,100 @@ export class MuseClient {
       }, 500);
 
       this.setStatus("connected");
+
+      if (controlChar) {
+        const ctrl = controlChar;
+
+        // Detached async IIFE — runs independently, does not block connect()
+        (async () => {
+          const pause = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+          const write = async (cmd: string): Promise<boolean> => {
+            try {
+              const pkt = encodeMuseCommand(cmd);
+              console.error(`[Muse] >> ${cmd}`);
+              await Promise.race([
+                ctrl.writeValueWithoutResponse(pkt),
+                pause(3000).then(() => { throw new Error("GATT write timeout"); }),
+              ]);
+              console.error(`[Muse] << ${cmd} OK`);
+              return true;
+            } catch (e) {
+              console.error(`[Muse] !! ${cmd} FAILED:`, e);
+              return false;
+            }
+          };
+
+          if (isAthena) {
+            // Round 1: halt + resume
+            console.error("[Muse] Athena round 1: h → d");
+            await write(CMD.HALT);
+            await pause(500);
+            await write(CMD.RESUME);
+            await pause(2500);
+
+            if (packetLogCount === 0) {
+              // Round 2: Athena EEG preset
+              console.error("[Muse] Athena round 2: p51 → d");
+              await write(CMD.PRESET_ATHENA_EEG);
+              await pause(500);
+              await write(CMD.RESUME);
+              await pause(2500);
+            }
+
+            if (packetLogCount === 0) {
+              // Round 3: Athena standard preset
+              console.error("[Muse] Athena round 3: p50 → d");
+              await write(CMD.PRESET_ATHENA_STD);
+              await pause(500);
+              await write(CMD.RESUME);
+              await pause(2500);
+            }
+
+            if (packetLogCount === 0) {
+              // Round 4: legacy preset (some Athena FW accepts p21)
+              console.error("[Muse] Athena round 4: p21 → d");
+              await write(CMD.PRESET_DEFAULT);
+              await pause(500);
+              await write(CMD.RESUME);
+              await pause(2500);
+            }
+
+            if (packetLogCount === 0) {
+              // Round 5: legacy 'p' + 's' (last resort)
+              console.error("[Muse] Athena round 5: p → s → d");
+              await write(CMD.PRESET_LEGACY);
+              await pause(500);
+              await write("s");
+              await pause(500);
+              await write(CMD.RESUME);
+              await pause(2500);
+            }
+
+            await write(CMD.VERSION);
+            console.error(`[Muse] Start sequence done — packets: ${packetLogCount}`);
+            if (packetLogCount === 0) {
+              console.error(
+                "[Muse] ✗ No EEG data after all presets. " +
+                "Try: power-cycle Muse, close ALL other BLE apps, reload page."
+              );
+            }
+          } else {
+            // Classic Muse 2
+            await write(CMD.HALT);
+            await pause(500);
+            await write(CMD.PRESET_DEFAULT);
+            await pause(500);
+            await write(CMD.PRESET_EEG);
+            await pause(500);
+            await write(CMD.PRESET_LEGACY);
+            await pause(500);
+            await write(CMD.RESUME);
+            await pause(500);
+            await write(CMD.VERSION);
+            console.error(`[Muse] Start sequence done — packets: ${packetLogCount}`);
+          }
+        })().catch((e) => console.error("[Muse] Start sequence crashed:", e));
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Connection failed";
       // User cancelled the device picker
