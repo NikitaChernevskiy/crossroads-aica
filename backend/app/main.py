@@ -25,6 +25,32 @@ from app.models import (
 )
 from app.rules import BehaviorRulesEngine
 
+# ── Observability setup ────────────────────────────────────────────────────
+# Configure Azure Monitor OpenTelemetry BEFORE any other logging so the
+# exporter captures traces, logs, and metrics from startup onward.
+_otel_enabled = False
+if settings.applicationinsights_connection_string:
+    try:
+        from azure.monitor.opentelemetry import configure_azure_monitor
+
+        configure_azure_monitor(
+            connection_string=settings.applicationinsights_connection_string,
+            enable_live_metrics=True,
+            logger_name="",  # instrument root logger → captures ALL loggers
+        )
+        _otel_enabled = True
+    except Exception as _otel_err:  # noqa: BLE001
+        logging.getLogger(__name__).warning(
+            "Azure Monitor OpenTelemetry init failed — continuing without: %s", _otel_err
+        )
+
+# Always configure root logger format and level, even without App Insights
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S%z",
+    force=True,  # override uvicorn's pre-existing handlers
+)
 logger = logging.getLogger(__name__)
 
 # Shared instances
@@ -48,6 +74,13 @@ async def lifespan(app: FastAPI):
         logger.info("Microsoft Foundry Agent Service initialized (agent=%s)", agent_service.agent_id)
     else:
         logger.warning("Foundry not configured — set FOUNDRY_PROJECT_ENDPOINT and MCP_SERVER_URL")
+
+    logger.info(
+        "Startup complete — otel=%s storage=%s foundry=%s",
+        _otel_enabled,
+        "cosmos" if not settings.use_in_memory and settings.cosmos_endpoint else "in-memory",
+        bool(settings.foundry_project_endpoint),
+    )
     yield
 
 

@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Key Vault (optional — used in production)
     keyvault_url: str = ""
 
+    # Observability — Azure Monitor / Application Insights
+    applicationinsights_connection_string: str = ""  # auto-detected by azure-monitor-opentelemetry
+    otel_service_name: str = "emopartner-backend"  # OpenTelemetry service name
+    log_level: str = "INFO"  # root log level (DEBUG/INFO/WARNING/ERROR)
+
     # MCP / API
     api_host: str = "0.0.0.0"
     api_port: int = 8000
